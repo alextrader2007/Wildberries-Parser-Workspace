@@ -505,7 +505,7 @@ export default function App() {
       setProducts(cached);
       setSuccessMessage(`Загружено ${cached.length} товаров продавца из кеша (${dest} / ${curr}).`);
       lastSearchRef.current = { type: 'seller', query: `Продавец ${id}`, skuInput: '', sellerId: id };
-      addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
+      addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr, pages });
       return;
     }
 
@@ -582,7 +582,7 @@ export default function App() {
     regionPriceCache.current[sellerSkuKey] = finalProducts;
     setProducts(finalProducts);
     lastSearchRef.current = { type: 'seller', query: `Продавец ${id}`, skuInput: '', sellerId: id };
-    addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
+    addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr, pages });
     if (chunkErrors.length > 0) {
       setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}.`);
     } else {
@@ -801,7 +801,7 @@ export default function App() {
                       </div>
                       {sellerHistory.map(entry => (
                         <button key={entry.id}
-                          onMouseDown={() => { setSellerId(entry.sellerId || entry.query.replace('Продавец ', '')); if (entry.dest) setDest(entry.dest); if (entry.curr) setCurr(entry.curr); }}
+                          onMouseDown={() => { setSellerId(entry.sellerId || entry.query.replace('Продавец ', '')); if (entry.pages) setPages(entry.pages); if (entry.dest) setDest(entry.dest); if (entry.curr) setCurr(entry.curr); }}
                           className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-xs border-b border-slate-50 dark:border-slate-700 last:border-0">
                           <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
                           <span className="flex-1 truncate text-slate-700 dark:text-slate-300">Продавец {entry.sellerId || entry.query.replace('Продавец ', '')}</span>
