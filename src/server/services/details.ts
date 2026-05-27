@@ -7,7 +7,6 @@ import {
 import {
   DETAIL_MIRRORS,
   FALLBACK_DESTS_FOR_STOCKS,
-  REGIONS,
 } from "../../shared/constants";
 import { fetchWithTimeout } from "../utils/fetch";
 import { getBasketDynamic } from "../utils/basket";
@@ -128,7 +127,6 @@ export async function fetchDetailsBatch(
   curr: string,
   whMap: WarehouseMap,
 ): Promise<ProductOutput[]> {
-  const moscowDest = REGIONS.MOSCOW;
   const skuString = skus.join(";");
 
   const headers: Record<string, string> = {
@@ -181,14 +179,12 @@ export async function fetchDetailsBatch(
   for (const p of regionalProducts) {
     if (!allInstancesMap[p.id]) allInstancesMap[p.id] = [];
     allInstancesMap[p.id].push(p);
-    if (dest === moscowDest) moscowMap[p.id] = p;
   }
 
   for (const list of extraResults) {
     for (const p of list) {
       if (!allInstancesMap[p.id]) allInstancesMap[p.id] = [];
       allInstancesMap[p.id].push(p);
-      if (dest === moscowDest) moscowMap[p.id] = p;
     }
   }
 
@@ -197,9 +193,11 @@ export async function fetchDetailsBatch(
 
   for (const prod of regionalProducts) {
     const id = prod.id;
-    const moscowProd = moscowMap[id];
-    const instances = allInstancesMap[id] || [prod];
-    merged.push(await buildProduct(prod, instances, moscowProd, whMap, walletConfig));
+    const allInst = allInstancesMap[id] || [prod];
+    const moscowProd = allInst.find(
+      (p) => p.time1 !== undefined && p.time2 !== undefined && (p.totalQuantity || 0) > 0
+    );
+    merged.push(await buildProduct(prod, allInst, moscowProd, whMap, walletConfig));
   }
 
   return merged;

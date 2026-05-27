@@ -36,12 +36,22 @@ export const FALLBACK_DESTS_FOR_STOCKS = [
   REGIONS.MOSCOW_CENTRAL,
   REGIONS.SPB_NORTHWEST,
   REGIONS.GRODNO,
+  "-1257786",
+  "-1181704",
+  "123585483",
+  "123585112",
+  "123585230",
 ];
 
 export const RUSSIAN_DESTS: Set<string> = new Set([
   REGIONS.MOSCOW_CENTRAL,
   REGIONS.SPB_NORTHWEST,
   REGIONS.MOSCOW,
+  "-1257786",
+  "-1181704",
+  "123585483",
+  "123585112",
+  "123585230",
 ]);
 
 export const CURRENCY_MAP: Record<string, string> = {
