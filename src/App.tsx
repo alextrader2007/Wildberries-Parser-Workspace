@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, Layers, RefreshCw, AlertCircle, CheckCircle2, Clock, ExternalLink, Clock9, Sun, Moon, X, Trash2 } from 'lucide-react';
 import { Product, BasketInfo } from './types';
 import { getBasketStatic, buildImageUrl, buildItemUrl } from './shared/basket';
@@ -84,6 +84,7 @@ export default function App() {
   const [showSellerHistory, setShowSellerHistory] = useState(false);
   const { history, addEntry, clearHistory, removeEntry } = useSearchHistory();
   const regionPriceCache = useRef<Record<string, Product[]>>({});
+  const lastSearchRef = useRef<{ type: string; query: string; skuInput: string; sellerId: string }>({ type: '', query: '', skuInput: '', sellerId: '' });
 
   const toggleDark = () => {
     setDarkMode(prev => {
@@ -323,6 +324,7 @@ export default function App() {
     if (cached) {
       setProducts(cached);
       setSuccessMessage(`Загружено ${cached.length} карточек из кеша (${dest} / ${curr}).`);
+      lastSearchRef.current = { type: 'keyword', query, skuInput: '', sellerId: '' };
       addEntry({ query, type: 'keyword', dest, curr, pages });
       return;
     }
@@ -396,6 +398,7 @@ export default function App() {
 
     regionPriceCache.current[cacheKey] = finalProducts;
     setProducts(finalProducts);
+    lastSearchRef.current = { type: 'keyword', query, skuInput: '', sellerId: '' };
     addEntry({ query, type: 'keyword', dest, curr, pages });
     if (chunkErrors.length > 0) {
       setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}. Попробуйте уменьшить глубину поиска.`);
@@ -414,6 +417,7 @@ export default function App() {
     if (cached) {
       setProducts(cached);
       setSuccessMessage(`Загружено ${cached.length} позиций из кеша (${dest} / ${curr}).`);
+      lastSearchRef.current = { type: 'sku', query: skuInput, skuInput, sellerId: '' };
       addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       return;
     }
@@ -450,6 +454,7 @@ export default function App() {
 
       regionPriceCache.current[cacheKey] = allParsed;
       setProducts(allParsed);
+      lastSearchRef.current = { type: 'sku', query: skuInput, skuInput, sellerId: '' };
       addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (allParsed.length === 0) {
         setError("Ни один из артикулов не найден.");
@@ -472,6 +477,7 @@ export default function App() {
       if (!response.ok || !data.success) throw new Error(data.error || "Ошибка парсинга.");
       regionPriceCache.current[cacheKey] = data.products;
       setProducts(data.products);
+      lastSearchRef.current = { type: 'sku', query: skuInput, skuInput, sellerId: '' };
       addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (data.products.length === 0) {
         setError("Ни один из артикулов не найден.");
@@ -492,6 +498,7 @@ export default function App() {
     if (cached) {
       setProducts(cached);
       setSuccessMessage(`Загружено ${cached.length} товаров продавца из кеша (${dest} / ${curr}).`);
+      lastSearchRef.current = { type: 'seller', query: `Продавец ${id}`, skuInput: '', sellerId: id };
       addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
       return;
     }
@@ -565,6 +572,7 @@ export default function App() {
 
     regionPriceCache.current[cacheKey] = finalProducts;
     setProducts(finalProducts);
+    lastSearchRef.current = { type: 'seller', query: `Продавец ${id}`, skuInput: '', sellerId: id };
     addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
     if (chunkErrors.length > 0) {
       setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}.`);
@@ -573,6 +581,22 @@ export default function App() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    const { type, query: lq, skuInput: lsi, sellerId: lsid } = lastSearchRef.current;
+    if (!type) return;
+    let cacheKey = '';
+    if (type === 'keyword') cacheKey = `keyword|${lq}|${dest}|${curr}`;
+    else if (type === 'sku') {
+      const sorted = lsi.split(/[\s,;\n]+/).map(s => s.trim()).filter(s => s && !isNaN(Number(s))).sort((a: string, b: string) => Number(a) - Number(b)).join(',');
+      cacheKey = `sku|${sorted}|${dest}|${curr}`;
+    } else if (type === 'seller') cacheKey = `seller|${lsid}|${dest}|${curr}`;
+    const cached = cacheKey ? regionPriceCache.current[cacheKey] : undefined;
+    if (cached) {
+      setProducts(cached);
+      setSuccessMessage(`Переключено на ${dest} / ${curr} (из кеша, ${cached.length} товаров).`);
+    }
+  }, [dest, curr]);
 
   return (
     <div className={`min-h-screen pb-16 font-sans antialiased ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50/50 text-slate-800'}`}>
