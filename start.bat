@@ -19,10 +19,10 @@ echo.
 :check_node
 where node >nul 2>&1
 if %errorlevel% equ 0 (
-    for /f "tokens=1 delims=v" %%a in ('node -v') do set node_ver_full=%%a
-    for /f "tokens=1 delims=." %%a in ("%node_ver_full%") do set node_major=%%a
-    if %node_major% geq 20 (
-        echo [OK] Node.js %node_ver_full%
+    for /f "tokens=1 delims=v" %%a in ('node -v') do set node_ver_raw=%%a
+    for /f "tokens=1 delims=." %%a in ("%node_ver_raw%") do set node_major=%%a
+    if not "%node_major%"=="" if %node_major% geq 20 (
+        echo [OK] Node.js v%node_ver_raw%
         goto :check_npm
     )
 )
@@ -37,10 +37,10 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 echo [..] Установка Node.js (окно появится на пару секунд)...
-msiexec /i "%NODE_MSI%" /qn /norestart | findstr /C:"success"
+msiexec /i "%NODE_MSI%" /qn /norestart
 del "%NODE_MSI%" 2>nul
 
-:: Обновляем PATH для текущей сессии
+:: Обновляем PATH
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 set "PATH=%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%PATH%"
 
@@ -60,7 +60,7 @@ if exist "node_modules\" (
     echo [OK] npm-зависимости уже установлены
     goto :check_python
 )
-echo [..] Установка npm-зависимостей...
+echo [..] Установка npm-зависимостей (может занять 1-2 минуты)...
 call npm install
 if %errorlevel% neq 0 (
     echo [ОШИБКА] npm install не удался
@@ -77,7 +77,7 @@ where python >nul 2>&1
 if %errorlevel% equ 0 (
     for /f "tokens=2" %%a in ('python --version 2^>^&1') do set py_ver=%%a
     for /f "tokens=1 delims=." %%a in ("%py_ver%") do set py_major=%%a
-    if %py_major% geq 3 goto :check_selenium
+    if not "%py_major%"=="" if %py_major% geq 3 goto :check_selenium
 )
 
 echo [..] Python %PYTHON_VERSION% не найден. Скачивание...
@@ -86,7 +86,7 @@ set PY_EXE=%TEMP%\python-install.exe
 powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%PY_URL%' -OutFile '%PY_EXE%' }"
 if %errorlevel% neq 0 (
     echo [ПРЕДУПРЕЖДЕНИЕ] Не удалось скачать Python. Поиск через Selenium будет недоступен.
-    echo         Установите вручную с https://python.org и запустите: pip install seleniumbase
+    echo         Установите вручную с https://python.org
     goto :launch
 )
 echo [..] Установка Python (окно появится на пару секунд)...
@@ -123,16 +123,59 @@ if %errorlevel% neq 0 (
 )
 
 :: ──────────────────────────────────────────────
-:: 5. Запуск
+:: 5. Запуск сервера
 :: ──────────────────────────────────────────────
 :launch
 echo.
 echo ============================================
 echo    Запуск сервера...
-echo    Откройте браузер: http://localhost:3000
+echo ============================================
+echo.
+
+:: Запускаем сервер в фоне, пишем лог
+start /b "" cmd /c "npm run dev > server.log 2>&1"
+
+:: Ждём пока порт 3000 не начнёт слушать
+echo [..] Ожидание сервера на порту 3000...
+set wait_count=0
+:wait_loop
+timeout /t 2 /nobreak >nul
+set /a wait_count+=1
+netstat -an 2>nul | findstr ":3000 " | findstr "LISTENING" >nul
+if not errorlevel 1 goto :server_ready
+if %wait_count% geq 30 (
+    echo.
+    echo -----------------------------------------
+    echo [ОШИБКА] Сервер не запустился за 60 с.
+    echo Проверьте server.log в папке проекта.
+    echo -----------------------------------------
+    pause
+    exit /b 1
+)
+echo    ... ждём (%wait_count% * 2 с)
+goto :wait_loop
+
+:server_ready
+echo [OK] Сервер запущен!
+echo.
+echo ============================================
+echo    Открываю браузер...
+echo    http://localhost:3000
 echo ============================================
 echo.
 
 start http://localhost:3000
-npm run dev
-pause
+
+:: Держим окно открытым, проверяем что сервер жив
+echo Нажмите Ctrl+C или закройте это окно чтобы остановить сервер.
+echo.
+:hold
+timeout /t 10 /nobreak >nul
+netstat -an 2>nul | findstr ":3000 " | findstr "LISTENING" >nul
+if errorlevel 1 (
+    echo.
+    echo [ВНИМАНИЕ] Сервер остановился. Проверьте server.log
+    pause
+    exit /b 1
+)
+goto :hold
