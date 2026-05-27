@@ -96,11 +96,15 @@ echo [OK] npm packages installed
 :: 3. Check / install Python 3.10+
 :: --------------------------------------------------
 :check_python
+:: Проверяем, что python — не Microsoft Store заглушка (которая есть, но не работает)
 where python >nul 2>&1
 if !errorlevel! equ 0 (
-    for /f "tokens=2" %%a in ('python --version 2^>^&1') do set "py_ver=%%a"
-    for /f "tokens=1 delims=." %%a in ("!py_ver!") do set "py_major=%%a"
-    if defined py_major if !py_major! geq 3 goto :check_selenium
+    python --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        for /f "tokens=2" %%a in ('python --version 2^>^&1') do set "py_ver=%%a"
+        for /f "tokens=1 delims=." %%a in ("!py_ver!") do set "py_major=%%a"
+        if defined py_major if !py_major! geq 3 goto :check_selenium
+    )
 )
 
 echo [..] Python %PYTHON_VERSION% not found. Downloading...
@@ -137,6 +141,7 @@ if !errorlevel! equ 0 (
     goto :shortcut
 )
 echo [..] Installing seleniumbase (Python)...
+python -m ensurepip --upgrade >nul 2>&1
 python -m pip install seleniumbase
 if !errorlevel! neq 0 (
     echo [WARNING] seleniumbase install failed. Selenium search unavailable.
