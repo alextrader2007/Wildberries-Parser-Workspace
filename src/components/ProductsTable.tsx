@@ -32,7 +32,8 @@ export default function ProductsTable({ products, currencySymbol, onSelectProduc
       result = result.filter(
         p => p.name.toLowerCase().includes(match) ||
              p.brand.toLowerCase().includes(match) ||
-             p.id.toString().includes(match)
+             p.id.toString().includes(match) ||
+             p.supplierId.toString().includes(match)
       );
     }
 
@@ -171,8 +172,10 @@ export default function ProductsTable({ products, currencySymbol, onSelectProduc
                     </div>
                     <p className="text-slate-600 dark:text-slate-400 line-clamp-1 truncate font-medium max-w-[260px]" title={p.name}>{p.name}</p>
                     <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
-                      <Store className="w-3 h-3 text-slate-400 dark:text-slate-500 mt-0.5" />
-                      <span className="truncate max-w-[150px]" title={p.supplier}>{p.supplier}</span>
+                      <Store className="w-3 h-3 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" />
+                      <span className="truncate max-w-[110px]" title={p.supplier}>{p.supplier}</span>
+                      <span className="text-slate-300 dark:text-slate-600">·</span>
+                      <span className="font-mono text-slate-500 dark:text-slate-400" title={`ID продавца: ${p.supplierId}`}>ID {p.supplierId}</span>
                     </div>
                   </td>
                   <td className="p-4 text-right font-mono">

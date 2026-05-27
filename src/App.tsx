@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Search, Layers, RefreshCw, AlertCircle, CheckCircle2, Clock, ExternalLink, Clock9, Sun, Moon, X, Trash2 } from 'lucide-react';
 import { Product, BasketInfo } from './types';
 import { getBasketStatic, buildImageUrl, buildItemUrl } from './shared/basket';
@@ -83,6 +83,7 @@ export default function App() {
   const [showSkuHistory, setShowSkuHistory] = useState(false);
   const [showSellerHistory, setShowSellerHistory] = useState(false);
   const { history, addEntry, clearHistory, removeEntry } = useSearchHistory();
+  const regionPriceCache = useRef<Record<string, Product[]>>({});
 
   const toggleDark = () => {
     setDarkMode(prev => {
@@ -316,6 +317,16 @@ export default function App() {
 
   const handleSearchParsing = async () => {
     if (!query.trim()) { setError("Пожалуйста, укажите поисковую ключевую фразу."); return; }
+
+    const cacheKey = `keyword|${query}|${dest}|${curr}`;
+    const cached = regionPriceCache.current[cacheKey];
+    if (cached) {
+      setProducts(cached);
+      setSuccessMessage(`Загружено ${cached.length} карточек из кеша (${dest} / ${curr}).`);
+      addEntry({ query, type: 'keyword', dest, curr, pages });
+      return;
+    }
+
     setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
     setLoadingStep("Загружаем справочник складов...");
 
@@ -383,6 +394,7 @@ export default function App() {
       .map(p => ({ ...p, position: clientMeta[p.id]?.position || 0, isPromo: clientMeta[p.id]?.isPromo || "Нет" }))
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
+    regionPriceCache.current[cacheKey] = finalProducts;
     setProducts(finalProducts);
     addEntry({ query, type: 'keyword', dest, curr, pages });
     if (chunkErrors.length > 0) {
@@ -396,6 +408,16 @@ export default function App() {
   const handleSkuParsing = async () => {
     const skusArray = skuInput.split(/[\s,;\n]+/).map(s => s.trim()).filter(s => s.length > 0 && !isNaN(Number(s))).map(Number);
     if (skusArray.length === 0) { setError("Укажите как минимум один числовой артикул."); return; }
+
+    const cacheKey = `sku|${skusArray.sort((a,b) => a-b).join(",")}|${dest}|${curr}`;
+    const cached = regionPriceCache.current[cacheKey];
+    if (cached) {
+      setProducts(cached);
+      setSuccessMessage(`Загружено ${cached.length} позиций из кеша (${dest} / ${curr}).`);
+      addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
+      return;
+    }
+
     setLoading(true); setError(null); setSuccessMessage(null);
     setLoadingStep("Загружаем справочник складов...");
 
@@ -426,6 +448,7 @@ export default function App() {
         }
       }
 
+      regionPriceCache.current[cacheKey] = allParsed;
       setProducts(allParsed);
       addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (allParsed.length === 0) {
@@ -447,6 +470,7 @@ export default function App() {
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || "Ошибка парсинга.");
+      regionPriceCache.current[cacheKey] = data.products;
       setProducts(data.products);
       addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (data.products.length === 0) {
@@ -462,6 +486,16 @@ export default function App() {
   const handleSellerParsing = async () => {
     const id = sellerId.trim();
     if (!id || isNaN(Number(id))) { setError("Укажите числовой ID продавца."); return; }
+
+    const cacheKey = `seller|${id}|${dest}|${curr}`;
+    const cached = regionPriceCache.current[cacheKey];
+    if (cached) {
+      setProducts(cached);
+      setSuccessMessage(`Загружено ${cached.length} товаров продавца из кеша (${dest} / ${curr}).`);
+      addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
+      return;
+    }
+
     setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
     setLoadingStep("Загружаем справочник складов...");
 
@@ -529,6 +563,7 @@ export default function App() {
       .map(p => ({ ...p, position: clientMeta[p.id]?.position || 0, isPromo: clientMeta[p.id]?.isPromo || "Нет" }))
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
+    regionPriceCache.current[cacheKey] = finalProducts;
     setProducts(finalProducts);
     addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
     if (chunkErrors.length > 0) {
