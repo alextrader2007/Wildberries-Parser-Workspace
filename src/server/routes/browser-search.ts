@@ -2,6 +2,7 @@ import { Router } from "express";
 import { execSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import { findPython } from "../utils/findPython";
 
 const router = Router();
 
@@ -21,8 +22,10 @@ router.post("/", async (req, res) => {
     const currentDest = dest || "-2888067";
     const currentCurr = curr || "byn";
 
+    const PYTHON = findPython();
+
     const result = execSync(
-      `python "${SCRIPT_PATH}" "${query}" ${maxPages} "${currentDest}" "${currentCurr}"`,
+      `"${PYTHON}" "${SCRIPT_PATH}" "${query}" ${maxPages} "${currentDest}" "${currentCurr}"`,
       { encoding: "utf-8", timeout: 300000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
     );
 

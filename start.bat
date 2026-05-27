@@ -96,14 +96,23 @@ echo [OK] npm packages installed
 :: 3. Check / install Python 3.10+
 :: --------------------------------------------------
 :check_python
-:: Проверяем, что python — не Microsoft Store заглушка (которая есть, но не работает)
+:: Проверяем, что python — не Microsoft Store заглушка (есть в PATH, но не работает)
 where python >nul 2>&1
 if !errorlevel! equ 0 (
     python --version >nul 2>&1
     if !errorlevel! equ 0 (
         for /f "tokens=2" %%a in ('python --version 2^>^&1') do set "py_ver=%%a"
         for /f "tokens=1 delims=." %%a in ("!py_ver!") do set "py_major=%%a"
-        if defined py_major if !py_major! geq 3 goto :check_selenium
+        if defined py_major if !py_major! geq 3 (
+            :: Сохраняем путь к настоящему python (не WindowsApps)
+            for /f "delims=" %%p in ('where python') do (
+                echo %%p | find /i "windowsapps" >nul
+                if !errorlevel! neq 0 (
+                    echo %%p > "%TEMP%\.python-path"
+                )
+            )
+            goto :check_selenium
+        )
     )
 )
 
@@ -122,14 +131,26 @@ del "%PY_EXE%" 2>nul
 
 :: Refresh PATH
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
-set "PATH=%ProgramFiles%\Python312;%ProgramFiles%\Python312\Scripts;%LocalAppData%\Programs\Python\Python312;%LocalAppData%\Programs\Python\Python312\Scripts;%PATH%"
+set "PATH=%ProgramFiles%\Python313;%ProgramFiles%\Python313\Scripts;%ProgramFiles%\Python312;%ProgramFiles%\Python312\Scripts;%LocalAppData%\Programs\Python\Python313;%LocalAppData%\Programs\Python\Python313\Scripts;%LocalAppData%\Programs\Python\Python312;%LocalAppData%\Programs\Python\Python312\Scripts;%PATH%"
 
 where python >nul 2>&1
 if !errorlevel! neq 0 (
     echo [WARNING] Python did not install. Selenium search will be unavailable.
     goto :launch
 )
+python --version >nul 2>&1
+if !errorlevel! neq 0 (
+    echo [WARNING] Python is Microsoft Store stub. Selenium search will be unavailable.
+    goto :launch
+)
 for /f "tokens=2" %%a in ('python --version 2^>^&1') do echo [OK] Python installed: %%a
+:: Save real python path (skip WindowsApps stub)
+for /f "delims=" %%p in ('where python') do (
+    echo %%p | find /i "windowsapps" >nul
+    if !errorlevel! neq 0 (
+        echo %%p > "%TEMP%\.python-path"
+    )
+)
 
 :: --------------------------------------------------
 :: 4. pip install seleniumbase

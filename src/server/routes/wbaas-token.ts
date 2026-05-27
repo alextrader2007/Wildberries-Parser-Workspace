@@ -2,6 +2,7 @@ import { Router } from "express";
 import { execSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import { findPython } from "../utils/findPython";
 
 const router = Router();
 
@@ -15,7 +16,8 @@ const SCRIPT_PATH = path.resolve(myDirname, "../../../scripts/get_wbaas_token.py
 
 function fetchTokenWithPython(): string | null {
   try {
-    const result = execSync(`python "${SCRIPT_PATH}"`, {
+    const PYTHON = findPython();
+    const result = execSync(`"${PYTHON}" "${SCRIPT_PATH}"`, {
       encoding: "utf-8",
       timeout: 90000,
       windowsHide: true,
