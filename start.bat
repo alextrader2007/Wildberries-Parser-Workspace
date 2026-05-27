@@ -113,7 +113,7 @@ for /f "tokens=2" %%a in ('python --version 2^>^&1') do echo [OK] Python install
 python -c "import seleniumbase" >nul 2>&1
 if !errorlevel! equ 0 (
     echo [OK] seleniumbase installed
-    goto :launch
+    goto :shortcut
 )
 echo [..] Installing seleniumbase (Python)...
 pip install seleniumbase
@@ -127,20 +127,11 @@ if !errorlevel! neq 0 (
 :: --------------------------------------------------
 :: 5. Desktop shortcut with icon (one-time)
 :: --------------------------------------------------
+:shortcut
 if exist "wb.ico" (
     if not exist "%USERPROFILE%\Desktop\Wildberries Parser.lnk" (
-        powershell -Command "& {
-            $WshShell = New-Object -ComObject WScript.Shell;
-            $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\Wildberries Parser.lnk');
-            $Shortcut.TargetPath = '%~dp0start.bat';
-            $Shortcut.WorkingDirectory = '%~dp0';
-            $Shortcut.IconLocation = '%~dp0wb.ico,0';
-            $Shortcut.Description = 'Wildberries Parser';
-            $Shortcut.Save();
-        }" >nul 2>&1
-        if !errorlevel! equ 0 (
-            echo [OK] Icon ^& shortcut created on Desktop
-        )
+        powershell -Command "& { $WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\Wildberries Parser.lnk'); $Shortcut.TargetPath = '%~dp0start.bat'; $Shortcut.WorkingDirectory = '%~dp0'; $Shortcut.IconLocation = '%~dp0wb.ico,0'; $Shortcut.Description = 'Wildberries Parser'; $Shortcut.Save(); }" >nul 2>&1
+        if !errorlevel! equ 0 echo [OK] Icon ^& shortcut created on Desktop
     )
 )
 
