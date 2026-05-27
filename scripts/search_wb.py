@@ -21,7 +21,10 @@ driver = Driver(
 
 all_products = []
 try:
-    driver.open("https://www.wildberries.ru/")
+    if seller_id:
+        driver.open(f"https://www.wildberries.ru/seller/{seller_id}")
+    else:
+        driver.open("https://www.wildberries.ru/")
     for _ in range(20):
         time.sleep(1.0)
         cookies = driver.execute_cdp_cmd("Network.getAllCookies", {})
@@ -57,6 +60,23 @@ try:
         """, search_url)
 
         products = result.get("products") or result.get("data", {}).get("products") or []
+        if not products and seller_id:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(3)
+            product_ids = driver.execute_script("""
+                var links = document.querySelectorAll('a');
+                var ids = [];
+                links.forEach(function(a) {
+                    var m = a.href.match(/\\/catalog\\/(\\d+)\\/detail/);
+                    if (m && ids.indexOf(parseInt(m[1],10)) === -1) ids.push(parseInt(m[1],10));
+                });
+                return ids.slice(0, 100);
+            """)
+            if product_ids:
+                for pid in product_ids:
+                    if not any(p.get("id") == pid for p in all_products):
+                        all_products.append({"id": pid, "name": "", "brand": "", "panelPromoId": 0})
+                break
         if not products:
             break
 
