@@ -26,7 +26,13 @@ router.post("/", async (req, res) => {
       { encoding: "utf-8", timeout: 300000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
     );
 
-    const data = JSON.parse(result.trim());
+    const output = result.trim();
+    const jsonStart = output.lastIndexOf("{");
+    const jsonEnd = output.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      return res.status(502).json({ error: `Пустой ответ от поискового скрипта: ${output.slice(0, 200)}` });
+    }
+    const data = JSON.parse(output.slice(jsonStart, jsonEnd + 1));
 
     if (!data.success) {
       return res.status(502).json({ error: data.error || "Ошибка поиска через браузер." });

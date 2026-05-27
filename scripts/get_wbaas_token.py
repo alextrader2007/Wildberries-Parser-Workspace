@@ -1,4 +1,6 @@
-import sys, time, os
+import sys, time, os, warnings
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
 from seleniumbase import Driver
 
 driver = Driver(

@@ -19,7 +19,7 @@ function fetchTokenWithPython(): string | null {
       timeout: 90000,
       windowsHide: true,
     });
-    const token = result.trim();
+    const token = result.trim().split("\n").filter(l => l && !l.startsWith("Warn")).pop() || "";
     if (token) {
       console.log(`[wbaas-token] Token obtained, length: ${token.length}`);
       return token;

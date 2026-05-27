@@ -1,4 +1,6 @@
-import sys, time, os, json, urllib.parse
+import sys, time, os, json, urllib.parse, warnings
+warnings.filterwarnings("ignore")
+os.environ["PYTHONWARNINGS"] = "ignore"
 from seleniumbase import Driver
 
 query = sys.argv[1] if len(sys.argv) > 1 else "платье"
