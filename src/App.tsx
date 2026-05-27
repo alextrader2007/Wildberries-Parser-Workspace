@@ -85,6 +85,7 @@ export default function App() {
   const { history, addEntry, clearHistory, removeEntry } = useSearchHistory();
   const regionPriceCache = useRef<Record<string, Product[]>>({});
   const lastSearchRef = useRef<{ type: string; query: string; skuInput: string; sellerId: string }>({ type: '', query: '', skuInput: '', sellerId: '' });
+  const lastSearchDataRef = useRef<{ skus: number[]; meta: Record<number, { position: number; isPromo: string }> }>({ skus: [], meta: {} });
 
   const toggleDark = () => {
     setDarkMode(prev => {
@@ -367,6 +368,7 @@ export default function App() {
       }
     });
 
+    lastSearchDataRef.current = { skus: clientSkus, meta: clientMeta };
     setLoadingStep(`Определяем корзины для ${clientSkus.length} SKU...`);
     let basketMap: Record<number, BasketInfo> = {};
     try {
@@ -423,6 +425,7 @@ export default function App() {
     }
 
     setLoading(true); setError(null); setSuccessMessage(null);
+    lastSearchDataRef.current = { skus: skusArray, meta: {} };
     setLoadingStep("Загружаем справочник складов...");
 
     try {
@@ -541,6 +544,7 @@ export default function App() {
       }
     });
 
+    lastSearchDataRef.current = { skus: clientSkus, meta: clientMeta };
     setLoadingStep(`Определяем корзины для ${clientSkus.length} SKU...`);
     let basketMap: Record<number, BasketInfo> = {};
     try {
@@ -583,19 +587,68 @@ export default function App() {
   };
 
   useEffect(() => {
-    const { type, query: lq, skuInput: lsi, sellerId: lsid } = lastSearchRef.current;
-    if (!type) return;
-    let cacheKey = '';
-    if (type === 'keyword') cacheKey = `keyword|${lq}|${dest}|${curr}`;
-    else if (type === 'sku') {
-      const sorted = lsi.split(/[\s,;\n]+/).map(s => s.trim()).filter(s => s && !isNaN(Number(s))).sort((a: string, b: string) => Number(a) - Number(b)).join(',');
-      cacheKey = `sku|${sorted}|${dest}|${curr}`;
-    } else if (type === 'seller') cacheKey = `seller|${lsid}|${dest}|${curr}`;
-    const cached = cacheKey ? regionPriceCache.current[cacheKey] : undefined;
+    const { type } = lastSearchRef.current;
+    const { skus, meta } = lastSearchDataRef.current;
+    if (!type || skus.length === 0) return;
+
+    const cacheKey = `${type}|${skus.sort((a,b) => a-b).join(',')}|${dest}|${curr}`;
+    const cached = regionPriceCache.current[cacheKey];
     if (cached) {
       setProducts(cached);
       setSuccessMessage(`Переключено на ${dest} / ${curr} (из кеша, ${cached.length} товаров).`);
+      return;
     }
+
+    let cancelled = false;
+    const prevDestCurr = `${dest}_${curr}`;
+    (async () => {
+      setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
+      setLoadingStep("Загружаем справочник складов...");
+      const storesRes = await fetch('/api/stores');
+      if (cancelled) { setLoading(false); return; }
+      const whMap = storesRes.ok ? await storesRes.json() : {};
+
+      let basketMap: Record<number, BasketInfo> = {};
+      try {
+        const bRes = await fetch('/api/basket-info', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: skus })
+        });
+        if (bRes.ok) basketMap = await bRes.json();
+      } catch (e) { console.warn("[ПВЗ] basket-info failed, using static guess", e); }
+
+      setLoadingStep(`Стягиваем региональные цены для ${skus.length} SKU...`);
+      let allParsed: Product[] = [];
+      let chunkErrors: string[] = [];
+      for (let i = 0; i < skus.length; i += CLIENT_CHUNK_SIZE) {
+        if (cancelled) break;
+        const chunk = skus.slice(i, i + CLIENT_CHUNK_SIZE);
+        setLoadingStep(`Региональные остатки (${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, skus.length)})...`);
+        try {
+          const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap, basketMap);
+          allParsed = [...allParsed, ...details];
+        } catch (e: any) {
+          console.warn(`[ПВЗ] Chunk ${i} failed:`, e);
+          chunkErrors.push(`позиции ${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, skus.length)}: ${e.message}`);
+        }
+      }
+
+      if (!cancelled) {
+        const finalProducts = allParsed
+          .map(p => ({ ...p, position: meta[p.id]?.position || 0, isPromo: meta[p.id]?.isPromo || "Нет" }))
+          .sort((a, b) => (a.position || 0) - (b.position || 0));
+        regionPriceCache.current[cacheKey] = finalProducts;
+        setProducts(finalProducts);
+        if (chunkErrors.length > 0) {
+          setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}.`);
+        } else {
+          setSuccessMessage(`Цены пересчитаны для ${dest} / ${curr}: ${finalProducts.length} товаров.`);
+        }
+        setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [dest, curr]);
 
   return (
