@@ -125,7 +125,27 @@ if !errorlevel! neq 0 (
 )
 
 :: --------------------------------------------------
-:: 5. Start server
+:: 5. Desktop shortcut with icon (one-time)
+:: --------------------------------------------------
+if exist "wb.ico" (
+    if not exist "%USERPROFILE%\Desktop\Wildberries Parser.lnk" (
+        powershell -Command "& {
+            $WshShell = New-Object -ComObject WScript.Shell;
+            $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\Desktop\Wildberries Parser.lnk');
+            $Shortcut.TargetPath = '%~dp0start.bat';
+            $Shortcut.WorkingDirectory = '%~dp0';
+            $Shortcut.IconLocation = '%~dp0wb.ico,0';
+            $Shortcut.Description = 'Wildberries Parser';
+            $Shortcut.Save();
+        }" >nul 2>&1
+        if !errorlevel! equ 0 (
+            echo [OK] Icon ^& shortcut created on Desktop
+        )
+    )
+)
+
+:: --------------------------------------------------
+:: 6. Start server
 :: --------------------------------------------------
 :launch
 echo.
