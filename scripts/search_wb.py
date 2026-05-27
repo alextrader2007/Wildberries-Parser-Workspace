@@ -1,4 +1,4 @@
-import sys, time, os, json, urllib.parse, warnings
+import sys, time, os, json, urllib.parse, urllib.request, warnings
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 from seleniumbase import Driver
@@ -8,6 +8,18 @@ pages = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 dest = sys.argv[3] if len(sys.argv) > 3 else "-2888067"
 curr = sys.argv[4] if len(sys.argv) > 4 else "byn"
 seller_id = sys.argv[5] if len(sys.argv) > 5 else ""
+
+if seller_id:
+    try:
+        req = urllib.request.Request(f"https://www.wildberries.ru/seller/{seller_id}", method="HEAD")
+        req.add_header("User-Agent", "Mozilla/5.0")
+        resp = urllib.request.urlopen(req, timeout=10)
+        if resp.getcode() != 200:
+            print(json.dumps({"success": False, "error": f"Страница продавца {seller_id} не найдена (HTTP {resp.getcode()})."}), flush=True)
+            sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"success": False, "error": f"Продавец {seller_id} не найден или страница недоступна."}), flush=True)
+        sys.exit(0)
 
 driver = Driver(
     uc=True,
@@ -23,7 +35,11 @@ all_products = []
 try:
     driver.set_page_load_timeout(30)
     if seller_id:
-        driver.open(f"https://www.wildberries.ru/seller/{seller_id}")
+        try:
+            driver.open(f"https://www.wildberries.ru/seller/{seller_id}")
+        except Exception:
+            print(json.dumps({"success": False, "error": "Страница продавца не загрузилась в браузере."}), flush=True)
+            sys.exit(0)
     else:
         driver.open("https://www.wildberries.ru/")
     for _ in range(20):

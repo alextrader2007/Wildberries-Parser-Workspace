@@ -23,7 +23,7 @@ router.post("/", async (req, res) => {
 
     const result = execSync(
       `"${PYTHON}" "${SCRIPT_PATH}" "" ${maxPages} "${currentDest}" "${currentCurr}" "${sellerId}"`,
-      { encoding: "utf-8", timeout: 120000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
+      { encoding: "utf-8", timeout: 60000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
     );
 
     const output = result.trim();
