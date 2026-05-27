@@ -1,0 +1,6 @@
+{
+  "name": "Wildberries Parser",
+  "description": "A powerful full-stack Wildberries parsing tool. Search items by keywords, parse multiple SKUs, view warehouse stocks, estimate WB Wallet prices, and generate beautiful Excel downloads with complete metrics and AI-driven niche insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
