@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Layers, RefreshCw, AlertCircle, CheckCircle2, Clock, ExternalLink } from 'lucide-react';
+import { Search, Layers, RefreshCw, AlertCircle, CheckCircle2, Clock, ExternalLink, Clock9, Sun, Moon, X, Trash2 } from 'lucide-react';
 import { Product, BasketInfo } from './types';
 import { getBasketStatic, buildImageUrl, buildItemUrl } from './shared/basket';
 import { CLIENT_CHUNK_SIZE, DETAIL_MIRRORS, FALLBACK_DESTS_FOR_STOCKS, REGIONS, WBAAS_SEARCH_ENDPOINT, WBAAS_TOKEN_REGEX, WBAAS_TOKEN_COOKIE_SRC, WBAAS_APP_TYPE, WBAAS_SPA_VERSION, WBAAS_SEARCH_PAGE_LIMIT } from './shared/constants';
@@ -9,6 +9,7 @@ import ProductMetadataDrawer from './components/ProductMetadataDrawer';
 import ConfigPanel from './components/ConfigPanel';
 import ProductsTable from './components/ProductsTable';
 import ExportSection from './components/ExportSection';
+import { useSearchHistory } from './hooks/useSearchHistory';
 
 interface ProxySource {
   name: string;
@@ -72,6 +73,26 @@ export default function App() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [darkMode, setDarkMode] = useState(() => {
+    const stored = localStorage.getItem('wb_dark_mode') === 'true';
+    if (stored) document.documentElement.classList.add('dark');
+    return stored;
+  });
+  const [showKeywordHistory, setShowKeywordHistory] = useState(false);
+  const [showSkuHistory, setShowSkuHistory] = useState(false);
+  const { history, addEntry, clearHistory, removeEntry } = useSearchHistory();
+
+  const toggleDark = () => {
+    setDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('wb_dark_mode', String(next));
+      document.documentElement.classList.toggle('dark', next);
+      return next;
+    });
+  };
+
+  const keywordHistory = history.filter(h => h.type === 'keyword');
+  const skuHistory = history.filter(h => h.type === 'sku');
 
   const getCurrencySymbol = () => {
     if (curr === 'byn') return 'BYN';
@@ -360,6 +381,7 @@ export default function App() {
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     setProducts(finalProducts);
+    addEntry({ query, type: 'keyword', dest, curr, pages });
     if (chunkErrors.length > 0) {
       setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}. Попробуйте уменьшить глубину поиска.`);
     } else {
@@ -402,6 +424,7 @@ export default function App() {
       }
 
       setProducts(allParsed);
+      addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (allParsed.length === 0) {
         setError("Ни один из артикулов не найден.");
       } else {
@@ -422,6 +445,7 @@ export default function App() {
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || "Ошибка парсинга.");
       setProducts(data.products);
+      addEntry({ query: skuInput, type: 'sku', skuInput, dest, curr });
       if (data.products.length === 0) {
         setError("Ни один из артикулов не найден.");
       } else {
@@ -433,21 +457,24 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-16 font-sans antialiased text-slate-800">
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4">
+    <div className={`min-h-screen pb-16 font-sans antialiased ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50/50 text-slate-800'}`}>
+      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-700 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-berry-700 to-berry-500 text-white flex items-center justify-center font-bold text-xl shadow-[0_4px_12px_rgba(203,38,230,0.2)] font-display">WB</div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight font-display flex items-center gap-1.5 leading-none">Wildberries Parser Workspace</h1>
-              <p className="text-[11px] text-slate-400 mt-0.5">Умный ИИ-аналитик логистики, цен и SEO-копирайтинга</p>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight font-display flex items-center gap-1.5 leading-none">Wildberries Parser Workspace</h1>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Умный ИИ-аналитик логистики, цен и SEO-копирайтинга</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1.5 rounded-full">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-full">
+              <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
               <span className="font-mono">UTC: 2026-05-25</span>
             </div>
+            <button onClick={toggleDark} className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title={darkMode ? 'Светлая тема' : 'Тёмная тема'}>
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <a href="https://www.wildberries.ru" target="_blank" rel="noopener noreferrer"
               className="text-xs font-semibold text-berry-600 hover:text-berry-800 flex items-center gap-1 hover:underline">
               Перейти на WB <ExternalLink className="w-3.5 h-3.5" />
@@ -457,16 +484,16 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.01)] overflow-hidden">
-          <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-[0_4px_24px_rgba(0,0,0,0.01)] overflow-hidden">
+          <div className="flex border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 p-1.5">
             <button onClick={() => { setActiveTab('keyword'); setError(null); }}
               className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'keyword' ? "bg-white text-berry-900 shadow-sm" : "text-slate-500 hover:bg-white/40 hover:text-slate-800"}`}>
+                activeTab === 'keyword' ? "bg-white dark:bg-slate-700 text-berry-900 dark:text-berry-300 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40 hover:text-slate-800 dark:hover:text-slate-200"}`}>
               <Search className="w-4 h-4 text-berry-500" /> Поиск по Ключевому Слову
             </button>
             <button onClick={() => { setActiveTab('sku'); setError(null); }}
               className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'sku' ? "bg-white text-berry-900 shadow-sm" : "text-slate-500 hover:bg-white/40 hover:text-slate-800"}`}>
+                activeTab === 'sku' ? "bg-white dark:bg-slate-700 text-berry-900 dark:text-berry-300 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40 hover:text-slate-800 dark:hover:text-slate-200"}`}>
               <Layers className="w-4 h-4 text-berry-500" /> Анализ Списка SKU
             </button>
           </div>
@@ -474,18 +501,37 @@ export default function App() {
           <div className="p-6 md:p-8 space-y-6">
             {activeTab === 'keyword' ? (
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Поисковый запрос</label>
+                <div className="md:col-span-2 space-y-1.5 relative">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Поисковый запрос <span className="text-slate-400 dark:text-slate-500 font-normal normal-case">({keywordHistory.length})</span></label>
                   <div className="relative">
                     <input type="text" value={query} onChange={(e) => setQuery(e.target.value)}
+                      onFocus={() => setShowKeywordHistory(true)}
+                      onBlur={() => setTimeout(() => setShowKeywordHistory(false), 200)}
                       placeholder="Пример: джинсы женские завышенные"
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 focus:bg-white text-sm border border-slate-200 focus:border-berry-500 focus:ring-1 focus:ring-berry-200 rounded-xl outline-none transition-all font-medium" />
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 text-sm border border-slate-200 dark:border-slate-600 focus:border-berry-500 focus:ring-1 focus:ring-berry-200 rounded-xl outline-none transition-all font-medium text-slate-800 dark:text-slate-200" />
                     <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
                   </div>
+                  {showKeywordHistory && keywordHistory.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">История поиска</span>
+                        <button onClick={clearHistory} className="text-[10px] text-red-500 hover:text-red-700 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Очистить</button>
+                      </div>
+                      {keywordHistory.map(entry => (
+                        <button key={entry.id}
+                          onMouseDown={() => { setQuery(entry.query); if (entry.pages) setPages(entry.pages); if (entry.dest) setDest(entry.dest); if (entry.curr) setCurr(entry.curr); }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-xs border-b border-slate-50 dark:border-slate-700 last:border-0">
+                          <Clock9 className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="flex-1 truncate text-slate-700 dark:text-slate-300">{entry.query}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <div className="flex justify-between">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Глубина поиска</label>
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Глубина поиска</label>
                     <span className="text-xs font-bold font-mono text-berry-600">{pages} стр.</span>
                   </div>
                   <input type="range" min="1" max="10" value={pages} onChange={(e) => setPages(Number(e.target.value))}
@@ -499,11 +545,30 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="md:col-span-3 space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Числовые SKU артикулы</label>
+                <div className="md:col-span-3 space-y-1.5 relative">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Числовые SKU артикулы</label>
                   <textarea rows={2} value={skuInput} onChange={(e) => setSkuInput(e.target.value)}
+                    onFocus={() => setShowSkuHistory(true)}
+                    onBlur={() => setTimeout(() => setShowSkuHistory(false), 200)}
                     placeholder="Вставьте список SKU, например: 172345591, 107932148"
-                    className="w-full p-3.5 bg-slate-50 focus:bg-white text-sm border border-slate-200 focus:border-berry-500 focus:ring-1 focus:ring-berry-200 rounded-xl outline-none transition-all font-mono text-xs" />
+                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 text-sm border border-slate-200 dark:border-slate-600 focus:border-berry-500 focus:ring-1 focus:ring-berry-200 rounded-xl outline-none transition-all font-mono text-xs text-slate-800 dark:text-slate-200" />
+                  {showSkuHistory && skuHistory.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">История SKU</span>
+                        <button onClick={clearHistory} className="text-[10px] text-red-500 hover:text-red-700 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Очистить</button>
+                      </div>
+                      {skuHistory.map(entry => (
+                        <button key={entry.id}
+                          onMouseDown={() => { setSkuInput(entry.skuInput || entry.query); }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-xs border-b border-slate-50 dark:border-slate-700 last:border-0">
+                          <Layers className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="flex-1 truncate text-slate-700 dark:text-slate-300 font-mono">{entry.query.substring(0, 60)}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button onClick={handleSkuParsing} disabled={loading}
                   className="w-full bg-berry-600 hover:bg-berry-700 disabled:bg-berry-300 text-white font-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl shadow-[0_4px_14px_rgba(203,38,230,0.15)] hover:shadow-[0_6px_20px_rgba(203,38,230,0.25)] transition-all flex items-center justify-center gap-2 h-[52px]">
@@ -516,38 +581,38 @@ export default function App() {
             <ConfigPanel dest={dest} setDest={setDest} curr={curr} setCurr={setCurr} />
 
             {loading && (
-              <div className="bg-berry-50/20 border border-berry-100 p-5 rounded-2xl flex items-center gap-4 animate-pulse">
+              <div className="bg-berry-50/20 dark:bg-berry-900/10 border border-berry-100 dark:border-berry-800 p-5 rounded-2xl flex items-center gap-4 animate-pulse">
                 <RefreshCw className="w-6 h-6 text-berry-600 animate-spin flex-shrink-0" />
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-berry-900">Выполняем парсинг...</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">{loadingStep}</p>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-berry-900 dark:text-berry-300">Выполняем парсинг...</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{loadingStep}</p>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-red-50 text-red-700 text-xs rounded-xl flex items-start gap-2.5 border border-red-100">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-xs rounded-xl flex items-start gap-2.5 border border-red-100 dark:border-red-800">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
                 <div>
                   <p className="font-semibold">Произошла ошибка</p>
-                  <p className="mt-0.5 text-slate-500">{error}</p>
+                  <p className="mt-0.5 text-slate-500 dark:text-slate-400">{error}</p>
                 </div>
               </div>
             )}
 
             {successMessage && !loading && (
-              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-start gap-2.5 border border-emerald-100">
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400 text-xs rounded-xl flex items-start gap-2.5 border border-emerald-100 dark:border-emerald-800">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-600" />
                 <p className="font-medium">{successMessage}</p>
               </div>
             )}
 
             {searchWarning && !loading && (
-              <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-xl flex items-start gap-2.5 border border-amber-100">
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-400 text-xs rounded-xl flex items-start gap-2.5 border border-amber-100 dark:border-amber-800">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
                 <div>
                   <p className="font-semibold">Парсинг выполнен частично</p>
-                  <p className="mt-0.5 text-slate-600 font-medium leading-relaxed">{searchWarning}</p>
+                  <p className="mt-0.5 text-slate-600 dark:text-slate-400 font-medium leading-relaxed">{searchWarning}</p>
                 </div>
               </div>
             )}

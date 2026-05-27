@@ -17,10 +17,18 @@
   --color-berry-900: #6f117a;
 }
 
+@variant dark (&:is(.dark *));
+
 body {
   font-family: var(--font-sans);
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+.dark body,
+body.dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
 }
 
 /* Scrollbar styles */
