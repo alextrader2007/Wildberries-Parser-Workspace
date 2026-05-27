@@ -36,7 +36,8 @@ const PROXY_SOURCES: ProxySource[] = [
 ];
 
 async function fetchViaProxy(url: string, usedProxies: Set<string>, parseJson: boolean): Promise<any> {
-  const enc = encodeURIComponent(url);
+  const sep = url.includes('?') ? '&' : '?';
+  const enc = encodeURIComponent(url + sep + '_cb=' + Date.now() + Math.random().toString(36).slice(2, 6));
   const available = PROXY_SOURCES.filter(s => !usedProxies.has(s.name)).sort(() => Math.random() - 0.5);
   if (available.length === 0) throw new Error("Все прокси исчерпаны.");
   let lastError: any = null;
@@ -399,6 +400,8 @@ export default function App() {
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     regionPriceCache.current[cacheKey] = finalProducts;
+    const skuCacheKey = `keyword|${clientSkus.sort((a,b) => a-b).join(',')}|${dest}|${curr}`;
+    regionPriceCache.current[skuCacheKey] = finalProducts;
     setProducts(finalProducts);
     lastSearchRef.current = { type: 'keyword', query, skuInput: '', sellerId: '' };
     addEntry({ query, type: 'keyword', dest, curr, pages });
@@ -575,6 +578,8 @@ export default function App() {
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     regionPriceCache.current[cacheKey] = finalProducts;
+    const sellerSkuKey = `seller|${clientSkus.sort((a,b) => a-b).join(',')}|${dest}|${curr}`;
+    regionPriceCache.current[sellerSkuKey] = finalProducts;
     setProducts(finalProducts);
     lastSearchRef.current = { type: 'seller', query: `Продавец ${id}`, skuInput: '', sellerId: id };
     addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
@@ -591,7 +596,8 @@ export default function App() {
     const { skus, meta } = lastSearchDataRef.current;
     if (!type || skus.length === 0) return;
 
-    const cacheKey = `${type}|${skus.sort((a,b) => a-b).join(',')}|${dest}|${curr}`;
+    const sortedSkus = [...skus].sort((a, b) => a - b);
+    const cacheKey = `${type}|${sortedSkus.join(',')}|${dest}|${curr}`;
     const cached = regionPriceCache.current[cacheKey];
     if (cached) {
       setProducts(cached);
@@ -599,9 +605,8 @@ export default function App() {
       return;
     }
 
-    let cancelled = false;
-    const prevDestCurr = `${dest}_${curr}`;
-    (async () => {
+  let cancelled = false;
+  (async () => {
       setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
       setLoadingStep("Загружаем справочник складов...");
       const storesRes = await fetch('/api/stores');
