@@ -1,4 +1,4 @@
-import sys, time, os, json, urllib.parse, warnings
+import sys, time, os, json, warnings
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 from seleniumbase import Driver
@@ -24,8 +24,9 @@ driver = Driver(
 
 all_products = []
 try:
-    driver.open("https://www.wildberries.ru/")
-    for _ in range(20):
+    driver.open(f"https://www.wildberries.ru/seller/{seller_id}")
+
+    for _ in range(30):
         time.sleep(1.0)
         cookies = driver.execute_cdp_cmd("Network.getAllCookies", {})
         has_token = any(c.get("name") == "x_wbaas_token" for c in cookies.get("cookies", []))
@@ -33,52 +34,41 @@ try:
             break
 
     for page in range(1, pages + 1):
-        params = (
-            f"ab_testing=false&appType=64&curr={curr}&dest={dest}"
-            f"&supplier={seller_id}&resultset=catalog&sort=popular&spp=30&limit=100&page={page}"
-        )
+        if page == 1:
+            time.sleep(3)
+        else:
+            driver.get(f"https://www.wildberries.ru/seller/{seller_id}?page={page}")
+            time.sleep(3)
 
-        search_url = f"https://www.wildberries.ru/__internal/u-search/exactmatch/sng/common/v18/search?{params}"
-
-        result = driver.execute_async_script("""
-            var url = arguments[0];
-            var done = arguments[1];
-            var controller = new AbortController();
-            setTimeout(function() { controller.abort(); }, 15000);
-            fetch(url, {
-                method: 'GET',
-                signal: controller.signal,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-Spa-Version': '13.15.1',
-                    'X-Userid': '0',
-                    'Accept': '*/*',
+        product_ids = driver.execute_script("""
+            var links = document.querySelectorAll('a');
+            var ids = [];
+            var seen = new Set();
+            for (var i = 0; i < links.length; i++) {
+                var href = links[i].getAttribute('href') || '';
+                var m = href.match(/\\/catalog\\/(\\d+)\\/detail/);
+                if (m && !seen.has(m[1])) {
+                    seen.add(m[1]);
+                    ids.push({id: parseInt(m[1])});
                 }
-            })
-            .then(r => r.text())
-            .then(t => JSON.parse(t))
-            .then(data => done(data))
-            .catch(e => done({error: e.message}));
-        """, search_url)
+            }
+            return ids;
+        """)
 
-        if result.get("error"):
-            print(json.dumps({"success": False, "error": result["error"]}), flush=True)
-            sys.exit(0)
+        if product_ids and len(product_ids) > 0:
+            seen_ids = {p.get("id") for p in all_products if p.get("id")}
+            for p in product_ids:
+                pid = p.get("id")
+                if pid and pid not in seen_ids:
+                    seen_ids.add(pid)
+                    all_products.append(p)
 
-        products = result.get("products") or result.get("data", {}).get("products") or []
-        if not products:
-            break
-
-        for prod in products:
-            prod_id = prod.get("id")
-            if prod_id and not any(p.get("id") == prod_id for p in all_products):
-                all_products.append(prod)
-
-        if page < pages:
-            time.sleep(1.5)
-
-    print(json.dumps({"success": True, "count": len(all_products), "products": all_products}), flush=True)
+    if not all_products:
+        print(json.dumps({"success": False, "error": "Не удалось найти товары продавца на странице."}), flush=True)
+    else:
+        print(json.dumps({"success": True, "count": len(all_products), "products": all_products}), flush=True)
 except Exception as e:
-    print(json.dumps({"success": False, "error": str(e)}), flush=True)
+    import traceback
+    print(json.dumps({"success": False, "error": str(e) + " " + traceback.format_exc()}), flush=True)
 finally:
     driver.quit()

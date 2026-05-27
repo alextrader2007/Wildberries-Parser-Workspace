@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { execSync } from "child_process";
+import { exec } from "child_process";
 import path from "path";
 import { findPython } from "../utils/findPython";
 
@@ -21,10 +21,14 @@ router.post("/", async (req, res) => {
 
     const PYTHON = findPython();
 
-    const result = execSync(
-      `"${PYTHON}" "${SCRIPT_PATH}" "${sellerId}" ${maxPages} "${currentDest}" "${currentCurr}"`,
-      { encoding: "utf-8", timeout: 120000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
-    );
+    const cmd = `"${PYTHON}" "${SCRIPT_PATH}" "${sellerId}" ${maxPages} "${currentDest}" "${currentCurr}"`;
+
+    const result = await new Promise<string>((resolve, reject) => {
+      exec(cmd, { encoding: "utf-8", timeout: 120000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout || "");
+      });
+    });
 
     const output = result.trim();
     const jsonStart = output.indexOf("{");

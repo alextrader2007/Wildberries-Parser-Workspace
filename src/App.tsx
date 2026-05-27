@@ -512,8 +512,13 @@ export default function App() {
     setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
     setLoadingStep("Загружаем справочник складов...");
 
-    const storesRes = await fetch('/api/stores');
-    const whMap = storesRes.ok ? await storesRes.json() : {};
+    let whMap: Record<number, string> = {};
+    try {
+      const storesRes = await fetch('/api/stores');
+      if (storesRes.ok) whMap = await storesRes.json();
+    } catch (e) {
+      console.warn("[Seller] stores fetch failed, using empty map", e);
+    }
 
     setLoadingStep("Поиск товаров продавца через браузер...");
     let response;
@@ -609,9 +614,14 @@ export default function App() {
   (async () => {
       setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
       setLoadingStep("Загружаем справочник складов...");
-      const storesRes = await fetch('/api/stores');
+      let whMap: Record<number, string> = {};
+      try {
+        const storesRes = await fetch('/api/stores');
+        if (storesRes.ok) whMap = await storesRes.json();
+      } catch (e) {
+        console.warn("[ПВЗ] stores fetch failed, using empty map", e);
+      }
       if (cancelled) { setLoading(false); return; }
-      const whMap = storesRes.ok ? await storesRes.json() : {};
 
       let basketMap: Record<number, BasketInfo> = {};
       try {
