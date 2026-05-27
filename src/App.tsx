@@ -384,13 +384,23 @@ export default function App() {
     try {
       const storesRes = await fetch('/api/stores');
       const whMap = storesRes.ok ? await storesRes.json() : {};
+
+      let basketMap: Record<number, string> = {};
+      try {
+        const bRes = await fetch('/api/basket-info', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: skusArray })
+        });
+        if (bRes.ok) basketMap = await bRes.json();
+      } catch {}
+
       setLoadingStep("Параллельный опрос карточек на клиенте...");
 
       let allParsed: any[] = [];
       for (let i = 0; i < skusArray.length; i += CLIENT_CHUNK_SIZE) {
         const chunk = skusArray.slice(i, i + CLIENT_CHUNK_SIZE);
         setLoadingStep(`Сбор региональных данных (${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, skusArray.length)})...`);
-        const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap);
+        const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap, basketMap);
         allParsed = [...allParsed, ...details];
       }
 

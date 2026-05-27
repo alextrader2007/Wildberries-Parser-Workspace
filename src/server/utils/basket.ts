@@ -1,12 +1,13 @@
 import { getBasketStatic, buildImageUrl } from "../../shared/basket";
 
-const basketCache = new Map<number, string>();
+const basketCache = new Map<number, { basket: string; ts: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 min
 
 export { getBasketStatic };
 
 export async function getBasketDynamic(vol: number, id: number): Promise<string> {
   const cached = basketCache.get(vol);
-  if (cached) return cached;
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.basket;
 
   const guess = getBasketStatic(vol);
   const headers = {
@@ -33,7 +34,7 @@ export async function getBasketDynamic(vol: number, id: number): Promise<string>
     const res = await fetch(testUrl(guess), { method: "HEAD", headers, signal: controller.signal });
     clearTimeout(timeoutId);
     if (res.ok) {
-      basketCache.set(vol, guess);
+      basketCache.set(vol, { basket: guess, ts: Date.now() });
       return guess;
     }
   } catch {}
@@ -41,7 +42,7 @@ export async function getBasketDynamic(vol: number, id: number): Promise<string>
   const common = ["39", "40", "41"].filter(b => b !== guess);
   const results = await Promise.all(common.map(b => checkBasket(b)));
   const found = results.find(r => r !== null);
-  if (found) { basketCache.set(vol, found); return found; }
+  if (found) { basketCache.set(vol, { basket: found, ts: Date.now() }); return found; }
 
   const allBaskets = Array.from({ length: 200 }, (_, i) => `${i + 1}`.padStart(2, "0"))
     .filter(b => b !== guess && b !== "39" && b !== "40" && b !== "41");
@@ -51,9 +52,9 @@ export async function getBasketDynamic(vol: number, id: number): Promise<string>
     const batch = allBaskets.slice(i, i + batchSize);
     const batchResults = await Promise.all(batch.map(b => checkBasket(b)));
     const batchFound = batchResults.find(r => r !== null);
-    if (batchFound) { basketCache.set(vol, batchFound); return batchFound; }
+    if (batchFound) { basketCache.set(vol, { basket: batchFound, ts: Date.now() }); return batchFound; }
   }
 
-  basketCache.set(vol, guess);
+  basketCache.set(vol, { basket: guess, ts: Date.now() });
   return guess;
 }
