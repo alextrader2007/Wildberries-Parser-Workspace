@@ -4,6 +4,9 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import rateLimit from "express-rate-limit";
 
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+
 import { fetchWithTimeout } from "./src/server/utils/fetch";
 import storesRouter from "./src/server/routes/stores";
 import parseSkusRouter from "./src/server/routes/parse-skus";
@@ -75,8 +78,13 @@ app.get("/api/wb-proxy", async (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
+      configFile: false,
       server: { middlewareMode: true },
       appType: "spa",
+      plugins: [react(), tailwindcss()],
+      resolve: {
+        alias: { "@": myDirname },
+      },
     });
     app.use(vite.middlewares);
   } else {
