@@ -27,10 +27,19 @@ router.post("/", async (req, res) => {
     );
 
     const output = result.trim();
-    const jsonStart = output.lastIndexOf("{");
-    const jsonEnd = output.lastIndexOf("}");
-    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    const jsonStart = output.indexOf("{");
+    if (jsonStart === -1) {
       return res.status(502).json({ error: `Пустой ответ от поискового скрипта: ${output.slice(0, 200)}` });
+    }
+    let depth = 0;
+    let jsonEnd = -1;
+    for (let i = jsonStart; i < output.length; i++) {
+      if (output[i] === "{") depth++;
+      else if (output[i] === "}") depth--;
+      if (depth === 0) { jsonEnd = i; break; }
+    }
+    if (jsonEnd === -1) {
+      return res.status(502).json({ error: `Не удалось найти JSON в ответе: ${output.slice(0, 200)}` });
     }
     const data = JSON.parse(output.slice(jsonStart, jsonEnd + 1));
 
