@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Layers, RefreshCw, AlertCircle, CheckCircle2, Clock, ExternalLink } from 'lucide-react';
-import { Product } from './types';
+import { Product, BasketInfo } from './types';
 import { getBasketStatic, buildImageUrl, buildItemUrl } from './shared/basket';
 import { CLIENT_CHUNK_SIZE, DETAIL_MIRRORS, FALLBACK_DESTS_FOR_STOCKS, REGIONS, WBAAS_SEARCH_ENDPOINT, WBAAS_TOKEN_REGEX, WBAAS_TOKEN_COOKIE_SRC, WBAAS_APP_TYPE, WBAAS_SPA_VERSION, WBAAS_SEARCH_PAGE_LIMIT } from './shared/constants';
 import MetricCards from './components/MetricCards';
@@ -9,6 +9,53 @@ import ProductMetadataDrawer from './components/ProductMetadataDrawer';
 import ConfigPanel from './components/ConfigPanel';
 import ProductsTable from './components/ProductsTable';
 import ExportSection from './components/ExportSection';
+
+interface ProxySource {
+  name: string;
+  getTarget: (enc: string, url: string) => string;
+}
+
+const PROXY_SOURCES: ProxySource[] = [
+  { name: 'local', getTarget: (_e: string, url: string) => `/api/wb-proxy?url=${encodeURIComponent(url)}` },
+  { name: 'corsproxy.io', getTarget: (enc: string) => `https://corsproxy.io/?url=${enc}` },
+  { name: 'allorigins', getTarget: (enc: string) => `https://api.allorigins.win/raw?url=${enc}` },
+  { name: 'codetabs', getTarget: (enc: string) => `https://codetabs.com/cors-proxy/request?url=${enc}` },
+  { name: 'crossorigin', getTarget: (_: string, url: string) => `https://crossorigin.me/${url}` },
+  { name: 'corsproxy.org', getTarget: (enc: string) => `https://corsproxy.org/?${enc}` },
+  { name: 'corsproxy.biz', getTarget: (enc: string) => `https://corsproxy.biz/?url=${enc}` },
+  { name: 'api.codetabs', getTarget: (enc: string) => `https://api.codetabs.com/v1/proxy?quest=${enc}` },
+  { name: 'proxy.cors.sh', getTarget: (enc: string) => `https://proxy.cors.sh/${enc}` },
+  { name: 'proxy.cors', getTarget: (enc: string) => `https://proxy.cors.biz/${enc}` },
+  { name: 'crossproxy', getTarget: (enc: string) => `https://crossproxy.me/?url=${enc}` },
+  { name: 'corsproxy.dev', getTarget: (enc: string) => `https://corsproxy.dev/${enc}` },
+  { name: 'corsproxy.live', getTarget: (enc: string) => `https://corsproxy.live/?url=${enc}` },
+  { name: 'proxy.cors.lol', getTarget: (enc: string) => `https://proxy.cors.lol/${enc}` },
+  { name: 'corsproxy.space', getTarget: (enc: string) => `https://corsproxy.space/?url=${enc}` },
+  { name: 'proxy.cors.sh1', getTarget: (enc: string) => `https://api.cors.sh/${enc}` },
+];
+
+async function fetchViaProxy(url: string, usedProxies: Set<string>, parseJson: boolean): Promise<any> {
+  const enc = encodeURIComponent(url);
+  const available = PROXY_SOURCES.filter(s => !usedProxies.has(s.name)).sort(() => Math.random() - 0.5);
+  if (available.length === 0) throw new Error("Все прокси исчерпаны.");
+  let lastError: any = null;
+  for (const source of available) {
+    usedProxies.add(source.name);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(source.getTarget(enc, url), { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const text = await res.text();
+        const trimmed = text.trim();
+        if (!trimmed || trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) continue;
+        return parseJson ? JSON.parse(trimmed) : trimmed;
+      }
+    } catch (err: any) { lastError = err; }
+  }
+  throw lastError || new Error("Все прокси временно перегружены.");
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'keyword' | 'sku'>('keyword');
@@ -33,73 +80,6 @@ export default function App() {
     return curr.toUpperCase();
   };
 
-  const PROXY_SOURCES = [
-    { name: 'local', getTarget: (_e: string, url: string) => `/api/wb-proxy?url=${encodeURIComponent(url)}` },
-    { name: 'corsproxy.io', getTarget: (enc: string) => `https://corsproxy.io/?url=${enc}` },
-    { name: 'allorigins', getTarget: (enc: string) => `https://api.allorigins.win/raw?url=${enc}` },
-    { name: 'codetabs', getTarget: (enc: string) => `https://codetabs.com/cors-proxy/request?url=${enc}` },
-    { name: 'crossorigin', getTarget: (_: string, url: string) => `https://crossorigin.me/${url}` },
-    { name: 'corsproxy.org', getTarget: (enc: string) => `https://corsproxy.org/?${enc}` },
-    { name: 'corsproxy.biz', getTarget: (enc: string) => `https://corsproxy.biz/?url=${enc}` },
-    { name: 'api.codetabs', getTarget: (enc: string) => `https://api.codetabs.com/v1/proxy?quest=${enc}` },
-    { name: 'proxy.cors.sh', getTarget: (enc: string) => `https://proxy.cors.sh/${enc}` },
-    { name: 'proxy.cors', getTarget: (enc: string) => `https://proxy.cors.biz/${enc}` },
-    { name: 'crossproxy', getTarget: (enc: string) => `https://crossproxy.me/?url=${enc}` },
-    { name: 'corsproxy.dev', getTarget: (enc: string) => `https://corsproxy.dev/${enc}` },
-    { name: 'corsproxy.live', getTarget: (enc: string) => `https://corsproxy.live/?url=${enc}` },
-    { name: 'proxy.cors.lol', getTarget: (enc: string) => `https://proxy.cors.lol/${enc}` },
-    { name: 'corsproxy.space', getTarget: (enc: string) => `https://corsproxy.space/?url=${enc}` },
-    { name: 'proxy.cors.sh1', getTarget: (enc: string) => `https://api.cors.sh/${enc}` },
-  ];
-
-  const fetchWithProxy = async (url: string, usedProxies: Set<string>): Promise<any> => {
-    const enc = encodeURIComponent(url);
-    const available = [...PROXY_SOURCES].filter(s => !usedProxies.has(s.name)).sort(() => Math.random() - 0.5);
-    if (available.length === 0) throw new Error("Все прокси исчерпаны.");
-
-    let lastError: any = null;
-    for (const source of available) {
-      usedProxies.add(source.name);
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(source.getTarget(enc, url), { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const text = await res.text();
-          const trimmed = text.trim();
-          if (!trimmed || trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html")) continue;
-          return JSON.parse(trimmed);
-        }
-      } catch (err: any) {
-        lastError = err;
-      }
-    }
-    throw lastError || new Error("Все прокси временно перегружены.");
-  };
-
-  const fetchHtmlWithProxy = async (url: string, usedProxies: Set<string>): Promise<string> => {
-    const enc = encodeURIComponent(url);
-    const available = [...PROXY_SOURCES].filter(s => !usedProxies.has(s.name)).sort(() => Math.random() - 0.5);
-    if (available.length === 0) throw new Error("Все прокси исчерпаны.");
-    let lastError: any = null;
-    for (const source of available) {
-      usedProxies.add(source.name);
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(source.getTarget(enc, url), { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const text = await res.text();
-          const trimmed = text.trim();
-          if (trimmed) return trimmed;
-        }
-      } catch (err: any) { lastError = err; }
-    }
-    throw lastError || new Error("Все прокси временно перегружены.");
-  };
-
   const wbaasTokenCache: { token: string | null; ts: number } = { token: null, ts: 0 };
   const WBAAS_TOKEN_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 
@@ -120,14 +100,14 @@ export default function App() {
 
     const proxySet = new Set<string>();
     try {
-      const html = await fetchHtmlWithProxy(WBAAS_TOKEN_COOKIE_SRC, proxySet);
+      const html = await fetchViaProxy(WBAAS_TOKEN_COOKIE_SRC, proxySet, false);
       const match = WBAAS_TOKEN_REGEX.exec(html);
       if (match) {
         wbaasTokenCache.token = match[1];
         wbaasTokenCache.ts = now;
         return match[1];
       }
-    } catch {}
+    } catch (e) { console.warn("[WbaasToken] proxy fallback failed", e); }
     return null;
   };
 
@@ -184,7 +164,7 @@ export default function App() {
     return [];
   };
 
-  const clientFetchDetailsBatch = async (skus: number[], currentDest: string, currentCurr: string, whMap: Record<number, string>, basketMap?: Record<number, string>): Promise<any[]> => {
+  const clientFetchDetailsBatch = async (skus: number[], currentDest: string, currentCurr: string, whMap: Record<number, string>, basketMap?: Record<number, BasketInfo>): Promise<Product[]> => {
     const skuString = skus.join(";");
     let regionalProducts: any[] = [];
     const detailProxies = new Set<string>();
@@ -192,13 +172,21 @@ export default function App() {
     for (const baseUrl of DETAIL_MIRRORS) {
       try {
         const url = `${baseUrl}?appType=1&curr=${currentCurr}&dest=${currentDest}&spp=30&nm=${skuString}`;
-        const payload = await fetchWithProxy(url, detailProxies);
+        const payload = await fetchViaProxy(url, detailProxies, true);
         const list = payload.products || payload.data?.products || [];
         if (list && list.length > 0) { regionalProducts = list; break; }
       } catch (err) { console.warn(`[Client] Mirror failed:`, err); }
     }
 
     if (regionalProducts.length === 0) throw new Error("Не удалось получить детальные данные.");
+
+    // Get wallet config for proper price calculation
+    let walletDiscount = 3;
+    let walletMaxPrice = 0;
+    try {
+      const wRes = await fetch('/api/wallet-config');
+      if (wRes.ok) { const wData = await wRes.json(); walletDiscount = wData.discount; walletMaxPrice = wData.maxPrice; }
+    } catch (e) { console.warn("[Client] wallet config fetch failed, using 3%", e); }
 
     const extraDests = FALLBACK_DESTS_FOR_STOCKS.filter(fd => fd !== currentDest);
     const moscowDest = REGIONS.MOSCOW_CENTRAL;
@@ -209,10 +197,10 @@ export default function App() {
       for (const baseUrl of DETAIL_MIRRORS) {
         try {
           const url = `${baseUrl}?appType=1&curr=${targetCurr}&dest=${targetDest}&spp=30&nm=${skuString}`;
-          const payload = await fetchWithProxy(url, detailProxies);
+          const payload = await fetchViaProxy(url, detailProxies, true);
           const list = payload.products || payload.data?.products || [];
           if (list && list.length > 0) return { dest: targetDest, products: list };
-        } catch {}
+        } catch (e) { console.warn(`[Client] Extra dest ${targetDest} failed:`, e); }
       }
       return { dest: targetDest, products: [] };
     };
@@ -235,7 +223,7 @@ export default function App() {
       }
     }
 
-    const merged: any[] = [];
+    const merged: Product[] = [];
     for (const prod of regionalProducts) {
       const id = prod.id;
       const moscowProd = moscowMap[id] || prod;
@@ -248,7 +236,9 @@ export default function App() {
       }
       const priceOriginal = priceU ? priceU / 100 : 0;
       const priceDiscounted = salePriceU ? salePriceU / 100 : 0;
-      const priceWallet = Math.floor(priceDiscounted * 0.97);
+      const priceWallet = (walletDiscount > 0 && (walletMaxPrice === 0 || priceDiscounted <= walletMaxPrice))
+        ? Math.floor(priceDiscounted * (100 - walletDiscount) / 100)
+        : priceDiscounted;
 
       const sizeWhQty: Record<string, Record<number, number>> = {};
       const mergeSizes = (sizesList: any[]) => {
@@ -283,7 +273,8 @@ export default function App() {
         ? Object.entries(whQuantities).map(([name, qty]) => `${name}: ${qty}`).join(", ")
         : "Нет в наличии";
 
-      const basket = basketMap?.[id] ? (basketMap[id] as any).basket : undefined;
+      const basketInfo = basketMap?.[id];
+      const basket = basketInfo?.basket;
       const imageUrl = basket ? `https://basket-${basket}.wbbasket.ru/vol${Math.floor(id/100000)}/part${Math.floor(id/1000)}/${id}/images/big/1.webp` : buildImageUrl(id);
       const itemUrl = buildItemUrl(id);
 
@@ -341,17 +332,18 @@ export default function App() {
     });
 
     setLoadingStep(`Определяем корзины для ${clientSkus.length} SKU...`);
-    let basketMap: Record<number, string> = {};
+    let basketMap: Record<number, BasketInfo> = {};
     try {
       const bRes = await fetch('/api/basket-info', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: clientSkus })
       });
       if (bRes.ok) basketMap = await bRes.json();
-    } catch {}
+    } catch (e) { console.warn("[Search] basket-info failed, using static guess", e); }
 
     setLoadingStep(`Собрано ${clientSkus.length} SKU. Стягиваем региональные цены...`);
-    let allParsed: any[] = [];
+    let allParsed: Product[] = [];
+    let chunkErrors: string[] = [];
     for (let i = 0; i < clientSkus.length; i += CLIENT_CHUNK_SIZE) {
       const chunk = clientSkus.slice(i, i + CLIENT_CHUNK_SIZE);
       setLoadingStep(`Региональные остатки (${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, clientSkus.length)})...`);
@@ -360,9 +352,7 @@ export default function App() {
         allParsed = [...allParsed, ...details];
       } catch (e: any) {
         console.warn(`[Search] Chunk ${i} failed:`, e);
-        setError(`Ошибка при загрузке деталей (позиции ${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, clientSkus.length)}): ${e.message}. Попробуйте уменьшить глубину поиска.`);
-        setLoading(false);
-        return;
+        chunkErrors.push(`позиции ${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, clientSkus.length)}: ${e.message}`);
       }
     }
 
@@ -371,7 +361,11 @@ export default function App() {
       .sort((a, b) => (a.position || 0) - (b.position || 0));
 
     setProducts(finalProducts);
-    setSuccessMessage(`Успешно собрано ${finalProducts.length} карточек товара!`);
+    if (chunkErrors.length > 0) {
+      setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}. Попробуйте уменьшить глубину поиска.`);
+    } else {
+      setSuccessMessage(`Успешно собрано ${finalProducts.length} карточек товара!`);
+    }
     setLoading(false);
   };
 
@@ -385,23 +379,27 @@ export default function App() {
       const storesRes = await fetch('/api/stores');
       const whMap = storesRes.ok ? await storesRes.json() : {};
 
-      let basketMap: Record<number, string> = {};
+      let basketMap: Record<number, BasketInfo> = {};
       try {
         const bRes = await fetch('/api/basket-info', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: skusArray })
         });
         if (bRes.ok) basketMap = await bRes.json();
-      } catch {}
+      } catch (e) { console.warn("[SKU] basket-info failed, using static guess", e); }
 
       setLoadingStep("Параллельный опрос карточек на клиенте...");
 
-      let allParsed: any[] = [];
+      let allParsed: Product[] = [];
       for (let i = 0; i < skusArray.length; i += CLIENT_CHUNK_SIZE) {
         const chunk = skusArray.slice(i, i + CLIENT_CHUNK_SIZE);
         setLoadingStep(`Сбор региональных данных (${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, skusArray.length)})...`);
-        const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap, basketMap);
-        allParsed = [...allParsed, ...details];
+        try {
+          const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap, basketMap);
+          allParsed = [...allParsed, ...details];
+        } catch (e: any) {
+          console.warn(`[SKU] Chunk ${i} failed:`, e);
+        }
       }
 
       setProducts(allParsed);

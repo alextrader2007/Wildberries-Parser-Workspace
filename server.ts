@@ -14,6 +14,7 @@ import geminiRouter from "./src/server/routes/gemini";
 import wbaasTokenRouter from "./src/server/routes/wbaas-token";
 import browserSearchRouter from "./src/server/routes/browser-search";
 import basketInfoRouter from "./src/server/routes/basket-info";
+import { getWalletConfig } from "./src/server/services/payment";
 
 const myFilename = typeof import.meta !== "undefined" && import.meta.url ? fileURLToPath(import.meta.url) : "";
 const myDirname = myFilename ? path.dirname(myFilename) : process.cwd();
@@ -42,6 +43,15 @@ app.use("/api/gemini", geminiRouter);
 app.use("/api/wbaas-token", wbaasTokenRouter);
 app.use("/api/browser-search", browserSearchRouter);
 app.use("/api/basket-info", basketInfoRouter);
+
+app.get("/api/wallet-config", async (_req, res) => {
+  try {
+    const config = await getWalletConfig();
+    res.json(config);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get("/api/wb-proxy", async (req, res) => {
   const targetUrl = req.query.url as string;

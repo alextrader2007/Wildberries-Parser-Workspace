@@ -1,7 +1,3 @@
-/**
- * Types and interfaces for the Wildberries Parser Application
- */
-
 export interface Product {
   id: number;
   name: string;
@@ -24,6 +20,13 @@ export interface Product {
   deliveryMsk?: string;
   description?: string;
   characteristics?: { name: string; value: string }[];
+}
+
+export interface BasketInfo {
+  vol: number;
+  part: number;
+  basket: string;
+  imageUrl: string;
 }
 
 export interface SearchState {
