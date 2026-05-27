@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Sparkles, MessageSquare, Flame, AlertCircle, RefreshCw, Landmark, Coins, Key } from 'lucide-react';
+import { Sparkles, MessageSquare, Flame, AlertCircle, RefreshCw, Landmark, Coins, Key, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Product } from '../types';
+import { downloadAsWord } from '../shared/word';
 import GeminiKeyModal from './GeminiKeyModal';
 
 interface AiAssistantProps {
@@ -168,8 +169,14 @@ export default function AiAssistant({ products }: AiAssistantProps) {
 
             {aiResponse && (
               <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6 shadow-inner mt-4">
-                <div className="flex items-center gap-1 text-xs font-bold text-berry-700 uppercase tracking-widest mb-4">
-                  <Sparkles className="w-4 h-4" /> Аналитическое заключение AI
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-1 text-xs font-bold text-berry-700 uppercase tracking-widest">
+                    <Sparkles className="w-4 h-4" /> Аналитическое заключение AI
+                  </div>
+                  <button onClick={() => downloadAsWord(aiResponse, 'Анализ Wildberries', `wb-ai-analysis`)}
+                    className="text-[11px] font-semibold text-berry-600 hover:text-berry-800 flex items-center gap-1 transition-colors">
+                    <FileText className="w-3.5 h-3.5" /> Word
+                  </button>
                 </div>
                 <div className="prose prose-slate max-w-none text-sm leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>

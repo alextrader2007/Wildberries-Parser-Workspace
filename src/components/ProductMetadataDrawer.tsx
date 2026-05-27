@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Sparkles, Copy, FileText, Check, ArrowRight, Table, AlertCircle, RefreshCw, PenTool, ExternalLink, MapPin } from 'lucide-react';
 import { Product } from '../types';
+import { downloadAsWord } from '../shared/word';
 import GeminiKeyModal from './GeminiKeyModal';
 
 interface ProductMetadataDrawerProps {
@@ -286,13 +287,19 @@ export default function ProductMetadataDrawer({ product, onClose }: ProductMetad
                   <div className="bg-white border border-berry-100 rounded-xl p-4 space-y-3 relative animate-fade-in shadow-xs">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <span className="text-[10px] uppercase font-bold text-slate-400">Сгенерированный текст</span>
-                      <button
-                        onClick={copyToClipboard}
-                        className="text-[11px] font-semibold text-berry-600 hover:text-berry-800 flex items-center gap-1 transition-colors"
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copied ? "Скопировано!" : "Копировать"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => downloadAsWord(seoText, 'SEO-текст Wildberries', `wb-seo-${product?.id || 'text'}`)}
+                          className="text-[11px] font-semibold text-berry-600 hover:text-berry-800 flex items-center gap-1 transition-colors">
+                          <FileText className="w-3.5 h-3.5" /> Word
+                        </button>
+                        <button
+                          onClick={copyToClipboard}
+                          className="text-[11px] font-semibold text-berry-600 hover:text-berry-800 flex items-center gap-1 transition-colors"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copied ? "Скопировано!" : "Копировать"}
+                        </button>
+                      </div>
                     </div>
                     <div className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto font-sans">
                       {seoText}
