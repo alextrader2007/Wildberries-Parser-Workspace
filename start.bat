@@ -96,7 +96,7 @@ echo [OK] npm packages installed
 :: 3. Check / install Python 3.10+
 :: --------------------------------------------------
 :check_python
-:: ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÐµÐ¼, Ñ‡Ñ‚Ð¾ python â€” Ð½Ðµ Microsoft Store Ð·Ð°Ð³Ð»ÑƒÑˆÐºÐ°
+:: Ïðîâåðÿåì, ÷òî python — íå Microsoft Store çàãëóøêà
 where python >nul 2>&1
 if !errorlevel! equ 0 (
     python -c "print(1)" >nul 2>&1
@@ -115,7 +115,7 @@ if !errorlevel! equ 0 (
     )
 )
 
-:: Fallback: Ð¿Ñ€Ð¾Ð²ÐµÑ€ÑÐµÐ¼ py -3 (Python Launcher, Ð½Ðµ Ð·Ð°Ð²Ð¸ÑÐ¸Ñ‚ Ð¾Ñ‚ App Execution Aliases)
+:: Fallback: ïðîâåðÿåì py -3 (Python Launcher, íå çàâèñèò îò App Execution Aliases)
 where py >nul 2>&1
 if !errorlevel! equ 0 (
     py -3 -c "print(1)" >nul 2>&1
@@ -143,7 +143,7 @@ del "%PY_EXE%" 2>nul
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 set "PATH=%ProgramFiles%\Python313;%ProgramFiles%\Python313\Scripts;%ProgramFiles%\Python312;%ProgramFiles%\Python312\Scripts;%LocalAppData%\Programs\Python\Python313;%LocalAppData%\Programs\Python\Python313\Scripts;%LocalAppData%\Programs\Python\Python312;%LocalAppData%\Programs\Python\Python312\Scripts;%PATH%"
 
-:: ÐŸÑ€Ð¾Ð²ÐµÑ€ÑÐµÐ¼ python (Ð¾Ñ‚ÑÐµÐºÐ°ÐµÐ¼ Microsoft Store stub)
+:: Ïðîâåðÿåì python (îòñåêàåì Microsoft Store stub)
 set "PYTHON_OK=0"
 where python >nul 2>&1
 if !errorlevel! equ 0 (
