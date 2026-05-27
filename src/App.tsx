@@ -59,11 +59,12 @@ async function fetchViaProxy(url: string, usedProxies: Set<string>, parseJson: b
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'keyword' | 'sku'>('keyword');
+  const [activeTab, setActiveTab] = useState<'keyword' | 'sku' | 'seller'>('keyword');
   const [query, setQuery] = useState('платье женское вечернее');
   const [pages, setPages] = useState(2);
   const [searchWarning, setSearchWarning] = useState<string | null>(null);
   const [skuInput, setSkuInput] = useState('172345591\n107932148\n218329431\n208173492');
+  const [sellerId, setSellerId] = useState('');
   const [dest, setDest] = useState('-2888067');
   const [curr, setCurr] = useState('byn');
   const [loading, setLoading] = useState(false);
@@ -80,6 +81,7 @@ export default function App() {
   });
   const [showKeywordHistory, setShowKeywordHistory] = useState(false);
   const [showSkuHistory, setShowSkuHistory] = useState(false);
+  const [showSellerHistory, setShowSellerHistory] = useState(false);
   const { history, addEntry, clearHistory, removeEntry } = useSearchHistory();
 
   const toggleDark = () => {
@@ -93,6 +95,7 @@ export default function App() {
 
   const keywordHistory = history.filter(h => h.type === 'keyword');
   const skuHistory = history.filter(h => h.type === 'sku');
+  const sellerHistory = history.filter(h => h.type === 'seller');
 
   const getCurrencySymbol = () => {
     if (curr === 'byn') return 'BYN';
@@ -456,6 +459,86 @@ export default function App() {
     } finally { setLoading(false); }
   };
 
+  const handleSellerParsing = async () => {
+    const id = sellerId.trim();
+    if (!id || isNaN(Number(id))) { setError("Укажите числовой ID продавца."); return; }
+    setLoading(true); setError(null); setSuccessMessage(null); setSearchWarning(null);
+    setLoadingStep("Загружаем справочник складов...");
+
+    const storesRes = await fetch('/api/stores');
+    const whMap = storesRes.ok ? await storesRes.json() : {};
+
+    setLoadingStep("Поиск товаров продавца через браузер...");
+    let response;
+    try {
+      response = await fetch('/api/browser-seller-search', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sellerId: id, pages, dest, curr })
+      });
+    } catch (e: any) {
+      setError("Не удалось запустить браузерный поиск по продавцу.");
+      setLoading(false);
+      return;
+    }
+
+    const data = await response.json();
+    if (!data.success || !data.products?.length) {
+      setError(data.error || `Ничего не найдено для продавца ${id}.`);
+      setLoading(false);
+      return;
+    }
+
+    const searchProducts = data.products;
+    const clientSkus: number[] = [];
+    const clientMeta: Record<number, { position: number; isPromo: string }> = {};
+
+    searchProducts.forEach((p: any, idx: number) => {
+      const pid = p.id;
+      if (pid && !clientMeta[pid]) {
+        clientMeta[pid] = { position: idx + 1, isPromo: p.panelPromoId && p.panelPromoId !== 0 ? "Да" : "Нет" };
+        clientSkus.push(pid);
+      }
+    });
+
+    setLoadingStep(`Определяем корзины для ${clientSkus.length} SKU...`);
+    let basketMap: Record<number, BasketInfo> = {};
+    try {
+      const bRes = await fetch('/api/basket-info', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: clientSkus })
+      });
+      if (bRes.ok) basketMap = await bRes.json();
+    } catch (e) { console.warn("[Seller] basket-info failed, using static guess", e); }
+
+    setLoadingStep(`Собрано ${clientSkus.length} SKU. Стягиваем региональные цены...`);
+    let allParsed: Product[] = [];
+    let chunkErrors: string[] = [];
+    for (let i = 0; i < clientSkus.length; i += CLIENT_CHUNK_SIZE) {
+      const chunk = clientSkus.slice(i, i + CLIENT_CHUNK_SIZE);
+      setLoadingStep(`Региональные остатки (${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, clientSkus.length)})...`);
+      try {
+        const details = await clientFetchDetailsBatch(chunk, dest, curr, whMap, basketMap);
+        allParsed = [...allParsed, ...details];
+      } catch (e: any) {
+        console.warn(`[Seller] Chunk ${i} failed:`, e);
+        chunkErrors.push(`позиции ${i + 1}-${Math.min(i + CLIENT_CHUNK_SIZE, clientSkus.length)}: ${e.message}`);
+      }
+    }
+
+    const finalProducts = allParsed
+      .map(p => ({ ...p, position: clientMeta[p.id]?.position || 0, isPromo: clientMeta[p.id]?.isPromo || "Нет" }))
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
+
+    setProducts(finalProducts);
+    addEntry({ query: `Продавец ${id}`, type: 'seller', sellerId: id, dest, curr });
+    if (chunkErrors.length > 0) {
+      setSearchWarning(`Частичный результат: ${finalProducts.length} товаров. Ошибки: ${chunkErrors.join("; ")}.`);
+    } else {
+      setSuccessMessage(`Успешно собрано ${finalProducts.length} товаров продавца ${id}!`);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className={`min-h-screen pb-16 font-sans antialiased ${darkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50/50 text-slate-800'}`}>
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-700 px-6 py-4">
@@ -495,6 +578,11 @@ export default function App() {
               className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === 'sku' ? "bg-white dark:bg-slate-700 text-berry-900 dark:text-berry-300 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40 hover:text-slate-800 dark:hover:text-slate-200"}`}>
               <Layers className="w-4 h-4 text-berry-500" /> Анализ Списка SKU
+            </button>
+            <button onClick={() => { setActiveTab('seller'); setError(null); }}
+              className={`flex-1 py-3 px-4 rounded-2xl text-xs font-bold tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'seller' ? "bg-white dark:bg-slate-700 text-berry-900 dark:text-berry-300 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-700/40 hover:text-slate-800 dark:hover:text-slate-200"}`}>
+              <ExternalLink className="w-4 h-4 text-berry-500" /> Аналитика Продавца
             </button>
           </div>
 
@@ -543,7 +631,7 @@ export default function App() {
                   Искать на WB
                 </button>
               </div>
-            ) : (
+            ) : activeTab === 'sku' ? (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="md:col-span-3 space-y-1.5 relative">
                   <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Числовые SKU артикулы</label>
@@ -574,6 +662,50 @@ export default function App() {
                   className="w-full bg-berry-600 hover:bg-berry-700 disabled:bg-berry-300 text-white font-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl shadow-[0_4px_14px_rgba(203,38,230,0.15)] hover:shadow-[0_6px_20px_rgba(203,38,230,0.25)] transition-all flex items-center justify-center gap-2 h-[52px]">
                   {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
                   Парсить артикулы
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="md:col-span-3 space-y-1.5 relative">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ID Продавца <span className="text-slate-400 dark:text-slate-500 font-normal normal-case">({sellerHistory.length})</span></label>
+                  <div className="relative">
+                    <input type="text" value={sellerId} onChange={(e) => setSellerId(e.target.value)}
+                      onFocus={() => setShowSellerHistory(true)}
+                      onBlur={() => setTimeout(() => setShowSellerHistory(false), 200)}
+                      placeholder="Пример: 12345678"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 text-sm border border-slate-200 dark:border-slate-600 focus:border-berry-500 focus:ring-1 focus:ring-berry-200 rounded-xl outline-none transition-all font-medium text-slate-800 dark:text-slate-200" />
+                    <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                  </div>
+                  {showSellerHistory && sellerHistory.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-700">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">История продавцов</span>
+                        <button onClick={clearHistory} className="text-[10px] text-red-500 hover:text-red-700 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Очистить</button>
+                      </div>
+                      {sellerHistory.map(entry => (
+                        <button key={entry.id}
+                          onMouseDown={() => { setSellerId(entry.sellerId || entry.query.replace('Продавец ', '')); if (entry.dest) setDest(entry.dest); if (entry.curr) setCurr(entry.curr); }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 text-xs border-b border-slate-50 dark:border-slate-700 last:border-0">
+                          <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="flex-1 truncate text-slate-700 dark:text-slate-300">Продавец {entry.sellerId || entry.query.replace('Продавец ', '')}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{new Date(entry.timestamp).toLocaleDateString()}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Глубина поиска</label>
+                    <span className="text-xs font-bold font-mono text-berry-600">{pages} стр.</span>
+                  </div>
+                  <input type="range" min="1" max="10" value={pages} onChange={(e) => setPages(Number(e.target.value))}
+                    className="w-full accent-berry-500 h-2 bg-slate-100 rounded-lg cursor-pointer" />
+                </div>
+                <button onClick={handleSellerParsing} disabled={loading}
+                  className="w-full bg-berry-600 hover:bg-berry-700 disabled:bg-berry-300 text-white font-bold text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl shadow-[0_4px_14px_rgba(203,38,230,0.15)] hover:shadow-[0_6px_20px_rgba(203,38,230,0.25)] transition-all flex items-center justify-center gap-2 h-[46px]">
+                  {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                  Анализировать продавца
                 </button>
               </div>
             )}

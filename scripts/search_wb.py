@@ -7,6 +7,7 @@ query = sys.argv[1] if len(sys.argv) > 1 else "платье"
 pages = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 dest = sys.argv[3] if len(sys.argv) > 3 else "-2888067"
 curr = sys.argv[4] if len(sys.argv) > 4 else "byn"
+seller_id = sys.argv[5] if len(sys.argv) > 5 else ""
 
 driver = Driver(
     uc=True,
@@ -29,9 +30,10 @@ try:
             break
 
     for page in range(1, pages + 1):
+        query_param = f"supplier={seller_id}" if seller_id else f"query={urllib.parse.quote(query)}"
         params = (
             f"ab_testing=false&appType=64&curr={curr}&dest={dest}"
-            f"&query={urllib.parse.quote(query)}&resultset=catalog&sort=popular&spp=30&limit=100&page={page}"
+            f"&{query_param}&resultset=catalog&sort=popular&spp=30&limit=100&page={page}"
         )
 
         search_url = f"https://www.wildberries.ru/__internal/u-search/exactmatch/sng/common/v18/search?{params}"

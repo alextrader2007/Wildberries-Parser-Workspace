@@ -16,6 +16,7 @@ import exportExcelRouter from "./src/server/routes/export-excel";
 import geminiRouter from "./src/server/routes/gemini";
 import wbaasTokenRouter from "./src/server/routes/wbaas-token";
 import browserSearchRouter from "./src/server/routes/browser-search";
+import browserSellerSearchRouter from "./src/server/routes/browser-seller-search";
 import basketInfoRouter from "./src/server/routes/basket-info";
 import { getWalletConfig } from "./src/server/services/payment";
 
@@ -45,6 +46,7 @@ app.use("/api/export-excel", exportExcelRouter);
 app.use("/api/gemini", geminiRouter);
 app.use("/api/wbaas-token", wbaasTokenRouter);
 app.use("/api/browser-search", browserSearchRouter);
+app.use("/api/browser-seller-search", browserSellerSearchRouter);
 app.use("/api/basket-info", basketInfoRouter);
 
 app.get("/api/wallet-config", async (_req, res) => {

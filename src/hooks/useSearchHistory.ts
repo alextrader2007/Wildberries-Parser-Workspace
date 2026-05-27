@@ -3,8 +3,9 @@ import { useState, useCallback, useEffect } from 'react';
 export interface SearchHistoryEntry {
   id: string;
   query: string;
-  type: 'keyword' | 'sku';
+  type: 'keyword' | 'sku' | 'seller';
   skuInput?: string;
+  sellerId?: string;
   dest: string;
   curr: string;
   pages?: number;
