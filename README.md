@@ -107,9 +107,11 @@ npm run dev
 
 **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS v4, Lucide React, react-markdown, motion
 
-**Backend:** Express 4, TypeScript, tsx, exceljs, sharp, @google/genai, https-proxy-agent
+**Backend:** Express 4, TypeScript, esbuild + Node (вместо tsx — ERR_INVALID_URL_SCHEME на Windows), exceljs, sharp, @google/genai, https-proxy-agent
 
 **Python:** seleniumbase (undetected-chromedriver), Chrome DevTools Protocol (CDP)
+
+**Сборка:** esbuild — бандлинг сервера, Vite — клиент. Dev-скрипт: `esbuild server.ts → dist/server.mjs && node dist/server.mjs`
 
 ## Структура проекта
 
@@ -127,7 +129,7 @@ src/
 ├── server/
 │   ├── routes/          # Express route handlers
 │   ├── services/        # Бизнес-логика (search, details, payment, warehouse, gemini-config)
-│   └── utils/           # Утилиты (basket, currency, fetchWithTimeout)
+│   └── utils/           # Утилиты (basket, currency, fetchWithTimeout, findPython)
 ├── shared/
 │   ├── basket.ts        # Функции работы с корзинами WB CDN
 │   ├── constants.ts     # Общие константы
@@ -146,6 +148,7 @@ start.bat                # Автоматическая установка и з
 
 - **Qrator-защита:** Прямые запросы с сервера возвращают 498. Все прямые запросы к API Wildberries выполняются либо через Chrome (Selenium + CDP), либо через браузерные CORS-прокси.
 - **Изображения:** Сервер возвращает basket-номер через `/api/basket-info`. Если корзина не угадана статически, `ProductImage` перебирает basket-01…99 через HEAD-запросы (wbbasket.ru разрешает CORS).
+- **Поиск Python:** `findPython.ts` — автоматический поиск реального Python (обходит Microsoft Store заглушку через `where python` с фильтром WindowsApps, `py -3` launcher, сканирование стандартных путей инсталляции).
 - **Excel:** Формируется на сервере с помощью `exceljs` + `sharp`. Каждый товар — отдельный лист с изображением (webp → png), характеристиками и описанием.
 - **Word-экспорт:** Любой ответ Gemini AI (анализ, SEO-текст) можно сохранить в `.doc` одной кнопкой — Word-совместимый HTML с форматированием.
 - **Gemini API ключ:** Можно задать через UI (сохраняется в `.gemini-config.json`) или через переменную окружения `GEMINI_API_KEY`.
