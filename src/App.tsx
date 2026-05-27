@@ -61,7 +61,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'keyword' | 'sku'>('keyword');
   const [query, setQuery] = useState('платье женское вечернее');
   const [pages, setPages] = useState(2);
-  const [pageDelay, setPageDelay] = useState(1.5);
   const [searchWarning, setSearchWarning] = useState<string | null>(null);
   const [skuInput, setSkuInput] = useState('172345591\n107932148\n218329431\n208173492');
   const [dest, setDest] = useState('-2888067');
@@ -490,15 +489,6 @@ export default function App() {
                     <span className="text-xs font-bold font-mono text-berry-600">{pages} стр.</span>
                   </div>
                   <input type="range" min="1" max="10" value={pages} onChange={(e) => setPages(Number(e.target.value))}
-                    className="w-full accent-berry-500 h-2 bg-slate-100 rounded-lg cursor-pointer" />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-berry-500" /> Задержка</label>
-                    <span className="text-xs font-bold font-mono text-berry-600">{pageDelay} сек.</span>
-                  </div>
-                  <input type="range" min="0.5" max="5" step="0.5" value={pageDelay} onChange={(e) => setPageDelay(Number(e.target.value))}
                     className="w-full accent-berry-500 h-2 bg-slate-100 rounded-lg cursor-pointer" />
                 </div>
                 <button onClick={handleSearchParsing} disabled={loading}
