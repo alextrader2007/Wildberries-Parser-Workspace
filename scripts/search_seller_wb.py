@@ -1,4 +1,4 @@
-import sys, time, os, json, warnings
+import sys, time, os, json, urllib.parse, warnings
 warnings.filterwarnings("ignore")
 os.environ["PYTHONWARNINGS"] = "ignore"
 from seleniumbase import Driver
@@ -32,29 +32,50 @@ try:
         if has_token:
             break
 
-    driver.execute_script(f"window.location.href = 'https://www.wildberries.ru/seller/{seller_id}';")
-    time.sleep(10)
+    for page in range(1, pages + 1):
+        params = (
+            f"ab_testing=false&appType=64&curr={curr}&dest={dest}"
+            f"&supplier={seller_id}&resultset=catalog&sort=popular&spp=30&limit=100&page={page}"
+        )
 
-    for _ in range(20):
-        time.sleep(1.0)
-        product_ids = driver.execute_script("""
-            var links = document.querySelectorAll('a');
-            var ids = [];
-            links.forEach(function(a) {
-                var m = a.href.match(/\\/catalog\\/(\\d+)\\/detail/);
-                if (m && ids.indexOf(parseInt(m[1],10)) === -1) ids.push(parseInt(m[1],10));
-            });
-            return ids.slice(0, 100);
-        """)
-        if product_ids and len(product_ids) > 0:
+        search_url = f"https://www.wildberries.ru/__internal/u-search/exactmatch/sng/common/v18/search?{params}"
+
+        result = driver.execute_async_script("""
+            var url = arguments[0];
+            var done = arguments[1];
+            var controller = new AbortController();
+            setTimeout(function() { controller.abort(); }, 15000);
+            fetch(url, {
+                method: 'GET',
+                signal: controller.signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Spa-Version': '13.15.1',
+                    'X-Userid': '0',
+                    'Accept': '*/*',
+                }
+            })
+            .then(r => r.text())
+            .then(t => JSON.parse(t))
+            .then(data => done(data))
+            .catch(e => done({error: e.message}));
+        """, search_url)
+
+        if result.get("error"):
+            print(json.dumps({"success": False, "error": result["error"]}), flush=True)
+            sys.exit(0)
+
+        products = result.get("products") or result.get("data", {}).get("products") or []
+        if not products:
             break
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(2)
 
-    if product_ids:
-        for pid in product_ids:
-            if not any(p.get("id") == pid for p in all_products):
-                all_products.append({"id": pid, "name": "", "brand": "", "panelPromoId": 0})
+        for prod in products:
+            prod_id = prod.get("id")
+            if prod_id and not any(p.get("id") == prod_id for p in all_products):
+                all_products.append(prod)
+
+        if page < pages:
+            time.sleep(1.5)
 
     print(json.dumps({"success": True, "count": len(all_products), "products": all_products}), flush=True)
 except Exception as e:
