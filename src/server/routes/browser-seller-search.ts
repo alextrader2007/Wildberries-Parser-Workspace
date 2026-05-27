@@ -5,7 +5,7 @@ import { findPython } from "../utils/findPython";
 
 const router = Router();
 
-const SCRIPT_PATH = path.resolve(process.cwd(), "scripts/search_wb.py");
+const SCRIPT_PATH = path.resolve(process.cwd(), "scripts/search_seller_wb.py");
 
 router.post("/", async (req, res) => {
   try {
@@ -22,14 +22,14 @@ router.post("/", async (req, res) => {
     const PYTHON = findPython();
 
     const result = execSync(
-      `"${PYTHON}" "${SCRIPT_PATH}" "" ${maxPages} "${currentDest}" "${currentCurr}" "${sellerId}"`,
+      `"${PYTHON}" "${SCRIPT_PATH}" "${sellerId}" ${maxPages} "${currentDest}" "${currentCurr}"`,
       { encoding: "utf-8", timeout: 120000, maxBuffer: 50 * 1024 * 1024, windowsHide: true }
     );
 
     const output = result.trim();
     const jsonStart = output.indexOf("{");
     if (jsonStart === -1) {
-      return res.status(502).json({ error: `Пустой ответ от поискового скрипта: ${output.slice(0, 200)}` });
+      return res.status(502).json({ error: `Пустой ответ от скрипта продавца: ${output.slice(0, 200)}` });
     }
     let depth = 0;
     let jsonEnd = -1;
