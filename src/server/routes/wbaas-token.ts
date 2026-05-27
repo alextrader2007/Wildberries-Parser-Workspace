@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { execSync } from "child_process";
-import { resolveRoot } from "../utils/paths";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const router = Router();
 
@@ -8,7 +9,9 @@ let cachedToken: string | null = null;
 let cachedAt = 0;
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 
-const SCRIPT_PATH = resolveRoot("scripts", "get_wbaas_token.py");
+const myFilename = typeof import.meta !== "undefined" && import.meta.url ? fileURLToPath(import.meta.url) : "";
+const myDirname = myFilename ? path.dirname(myFilename) : process.cwd();
+const SCRIPT_PATH = path.resolve(myDirname, "../../../scripts/get_wbaas_token.py");
 
 function fetchTokenWithPython(): string | null {
   try {

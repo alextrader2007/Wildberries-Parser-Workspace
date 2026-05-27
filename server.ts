@@ -1,8 +1,8 @@
 import express from "express";
 import path from "path";
+import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import rateLimit from "express-rate-limit";
-import { resolveRoot } from "./src/server/utils/paths";
 
 import { fetchWithTimeout } from "./src/server/utils/fetch";
 import storesRouter from "./src/server/routes/stores";
@@ -14,6 +14,9 @@ import geminiRouter from "./src/server/routes/gemini";
 import wbaasTokenRouter from "./src/server/routes/wbaas-token";
 import browserSearchRouter from "./src/server/routes/browser-search";
 import basketInfoRouter from "./src/server/routes/basket-info";
+
+const myFilename = typeof import.meta !== "undefined" && import.meta.url ? fileURLToPath(import.meta.url) : "";
+const myDirname = myFilename ? path.dirname(myFilename) : process.cwd();
 
 const app = express();
 const PORT = 3000;
