@@ -10,3 +10,4 @@ coverage/
 token_output.txt
 downloaded_files/
 server.log
+release/
