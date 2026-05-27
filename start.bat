@@ -29,7 +29,7 @@ if !errorlevel! equ 0 (
     )
 )
 
-echo [..] Node.js %NODE_VERSION% not found. Downloading…
+echo [..] Node.js %NODE_VERSION% not found. Downloading...
 set "NODE_URL=https://nodejs.org/dist/v%NODE_VERSION%/node-v%NODE_VERSION%-x64.msi"
 set "NODE_MSI=%TEMP%\node-install.msi"
 powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%NODE_URL%' -OutFile '%NODE_MSI%' }"
@@ -39,23 +39,27 @@ if !errorlevel! neq 0 (
     exit /b 1
 )
 
-echo [..] Installing Node.js (silent, may need admin rights)…
-:: Try normal install first
+echo [..] Installing Node.js...
 msiexec /i "%NODE_MSI%" /qn /norestart
 
-:: If node not found after MSI — try elevated install via PowerShell
-where node >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [..] Retrying with elevated rights…
-    powershell -Command "Start-Process msiexec -ArgumentList '/i \"%NODE_MSI%\" /qn /norestart' -Wait -Verb RunAs"
-)
-del "%NODE_MSI%" 2>nul
-
-:: Refresh PATH — check all known locations
+:: Refresh PATH
 set "NODE_PATHS=%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%LocalAppData%\Programs\nodejs;%AppData%\npm;%USERPROFILE%\AppData\Roaming\npm"
 set "PATH=%NODE_PATHS%;%PATH%"
+for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
+for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 
-:: Read system PATH from registry as well
+where node >nul 2>&1
+if !errorlevel! equ 0 goto :node_ok
+
+:: Retry with admin elevation
+echo [..] Requesting admin rights for Node.js install...
+echo Start-Process msiexec -ArgumentList '/i "%NODE_MSI%" /qn /norestart' -Wait -Verb RunAs > "%TEMP%\install_node.ps1"
+powershell -ExecutionPolicy Bypass -File "%TEMP%\install_node.ps1" >nul 2>&1
+del "%TEMP%\install_node.ps1" 2>nul
+del "%NODE_MSI%" 2>nul
+
+:: Refresh PATH again
+set "PATH=%NODE_PATHS%;%PATH%"
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 
@@ -67,6 +71,8 @@ if !errorlevel! neq 0 (
     pause
     exit /b 1
 )
+
+:node_ok
 for /f "tokens=1 delims=v" %%a in ('node -v') do echo [OK] Node.js installed: v%%a
 
 :: --------------------------------------------------
