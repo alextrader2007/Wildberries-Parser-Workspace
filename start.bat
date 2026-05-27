@@ -131,21 +131,16 @@ for /f "tokens=2" %%a in ('python --version 2^>^&1') do echo [OK] Python install
 :: 4. pip install seleniumbase
 :: --------------------------------------------------
 :check_selenium
-:: Ensure pip is in PATH
-set "PIP_PATHS=%ProgramFiles%\Python312\Scripts;%ProgramFiles%\Python313\Scripts;%LocalAppData%\Programs\Python\Python312\Scripts;%LocalAppData%\Programs\Python\Python313\Scripts;%USERPROFILE%\AppData\Local\Programs\Python\Python312\Scripts;%USERPROFILE%\AppData\Local\Programs\Python\Python313\Scripts"
-set "PATH=%PIP_PATHS%;%PATH%"
-for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
-
 python -c "import seleniumbase" >nul 2>&1
 if !errorlevel! equ 0 (
     echo [OK] seleniumbase installed
     goto :shortcut
 )
 echo [..] Installing seleniumbase (Python)...
-pip install seleniumbase
+python -m pip install seleniumbase
 if !errorlevel! neq 0 (
     echo [WARNING] seleniumbase install failed. Selenium search unavailable.
-    echo           Run manually: pip install seleniumbase
+    echo           Run manually: python -m pip install seleniumbase
 ) else (
     echo [OK] seleniumbase installed
 )
