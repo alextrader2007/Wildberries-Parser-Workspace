@@ -29,7 +29,7 @@ if !errorlevel! equ 0 (
     )
 )
 
-echo [..] Node.js %NODE_VERSION% not found. Downloading...
+echo [..] Node.js %NODE_VERSION% not found. Downloading…
 set "NODE_URL=https://nodejs.org/dist/v%NODE_VERSION%/node-v%NODE_VERSION%-x64.msi"
 set "NODE_MSI=%TEMP%\node-install.msi"
 powershell -Command "& { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%NODE_URL%' -OutFile '%NODE_MSI%' }"
@@ -38,17 +38,32 @@ if !errorlevel! neq 0 (
     pause
     exit /b 1
 )
-echo [..] Installing Node.js (silent, window may flash)...
+
+echo [..] Installing Node.js (silent, may need admin rights)…
+:: Try normal install first
 msiexec /i "%NODE_MSI%" /qn /norestart
+
+:: If node not found after MSI — try elevated install via PowerShell
+where node >nul 2>&1
+if !errorlevel! neq 0 (
+    echo [..] Retrying with elevated rights…
+    powershell -Command "Start-Process msiexec -ArgumentList '/i \"%NODE_MSI%\" /qn /norestart' -Wait -Verb RunAs"
+)
 del "%NODE_MSI%" 2>nul
 
-:: Refresh PATH
+:: Refresh PATH — check all known locations
+set "NODE_PATHS=%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%LocalAppData%\Programs\nodejs;%AppData%\npm;%USERPROFILE%\AppData\Roaming\npm"
+set "PATH=%NODE_PATHS%;%PATH%"
+
+:: Read system PATH from registry as well
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
-set "PATH=%ProgramFiles%\nodejs;%ProgramFiles(x86)%\nodejs;%PATH%"
+for /f "tokens=2*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 
 where node >nul 2>&1
 if !errorlevel! neq 0 (
-    echo [ERROR] Node.js did not install. Install manually from https://nodejs.org
+    echo [ERROR] Node.js did not install.
+    echo         Try installing manually from https://nodejs.org
+    echo         or run this batch as Administrator.
     pause
     exit /b 1
 )
