@@ -17,6 +17,7 @@ export default function ProductsTable({ products, currencySymbol, onSelectProduc
   const [onlyOnStock, setOnlyOnStock] = useState(false);
   const [sortKey, setSortKey] = useState<string>('default');
   const [copiedSku, setCopiedSku] = useState<number | null>(null);
+  const [copiedSupplierId, setCopiedSupplierId] = useState<number | null>(null);
 
   const suppliersList = useMemo(() => {
     const set = new Set<string>();
@@ -66,6 +67,11 @@ export default function ProductsTable({ products, currencySymbol, onSelectProduc
     navigator.clipboard.writeText(sku.toString());
     setCopiedSku(sku);
     setTimeout(() => setCopiedSku(null), 1500);
+  };
+  const copySupplierId = (id: number) => {
+    navigator.clipboard.writeText(id.toString());
+    setCopiedSupplierId(id);
+    setTimeout(() => setCopiedSupplierId(null), 1500);
   };
 
   return (
@@ -173,9 +179,12 @@ export default function ProductsTable({ products, currencySymbol, onSelectProduc
                     <p className="text-slate-600 dark:text-slate-400 line-clamp-1 truncate font-medium max-w-[260px]" title={p.name}>{p.name}</p>
                     <div className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
                       <Store className="w-3 h-3 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" />
-                      <span className="truncate max-w-[110px]" title={p.supplier}>{p.supplier}</span>
+                      <span className="truncate max-w-[100px]" title={p.supplier}>{p.supplier}</span>
                       <span className="text-slate-300 dark:text-slate-600">·</span>
                       <span className="font-mono text-slate-500 dark:text-slate-400" title={`ID продавца: ${p.supplierId}`}>ID {p.supplierId}</span>
+                      <button onClick={() => copySupplierId(p.supplierId)} className="text-slate-400 hover:text-berry-700 dark:hover:text-berry-400 flex items-center gap-0.5" title="Скопировать ID продавца">
+                        {copiedSupplierId === p.supplierId ? "OK" : <Copy className="w-3 h-3" />}
+                      </button>
                     </div>
                   </td>
                   <td className="p-4 text-right font-mono">
