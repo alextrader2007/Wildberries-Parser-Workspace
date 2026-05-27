@@ -96,15 +96,14 @@ echo [OK] npm packages installed
 :: 3. Check / install Python 3.10+
 :: --------------------------------------------------
 :check_python
-:: Проверяем, что python — не Microsoft Store заглушка (есть в PATH, но не работает)
+:: Проверяем, что python — не Microsoft Store заглушка
 where python >nul 2>&1
 if !errorlevel! equ 0 (
-    python --version >nul 2>&1
+    python -c "print(1)" >nul 2>&1
     if !errorlevel! equ 0 (
         for /f "tokens=2" %%a in ('python --version 2^>^&1') do set "py_ver=%%a"
         for /f "tokens=1 delims=." %%a in ("!py_ver!") do set "py_major=%%a"
         if defined py_major if !py_major! geq 3 (
-            :: Сохраняем путь к настоящему python (не WindowsApps)
             for /f "delims=" %%p in ('where python') do (
                 echo %%p | find /i "windowsapps" >nul
                 if !errorlevel! neq 0 (
@@ -113,6 +112,17 @@ if !errorlevel! equ 0 (
             )
             goto :check_selenium
         )
+    )
+)
+
+:: Fallback: проверяем py -3 (Python Launcher, не зависит от App Execution Aliases)
+where py >nul 2>&1
+if !errorlevel! equ 0 (
+    py -3 -c "print(1)" >nul 2>&1
+    if !errorlevel! equ 0 (
+        py -3 -c "import sys; print(sys.executable)" > "%TEMP%\.python-path"
+        for /f "tokens=2" %%a in ('py -3 --version 2^>^&1') do echo [OK] Python found via py launcher: %%a
+        goto :check_selenium
     )
 )
 
@@ -133,22 +143,37 @@ del "%PY_EXE%" 2>nul
 for /f "tokens=2*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "PATH=%%b;%PATH%"
 set "PATH=%ProgramFiles%\Python313;%ProgramFiles%\Python313\Scripts;%ProgramFiles%\Python312;%ProgramFiles%\Python312\Scripts;%LocalAppData%\Programs\Python\Python313;%LocalAppData%\Programs\Python\Python313\Scripts;%LocalAppData%\Programs\Python\Python312;%LocalAppData%\Programs\Python\Python312\Scripts;%PATH%"
 
+:: Проверяем python (отсекаем Microsoft Store stub)
+set "PYTHON_OK=0"
 where python >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [WARNING] Python did not install. Selenium search will be unavailable.
-    goto :launch
+if !errorlevel! equ 0 (
+    python -c "print(1)" >nul 2>&1
+    if !errorlevel! equ 0 (
+        set "PYTHON_OK=1"
+        for /f "tokens=2" %%a in ('python --version 2^>^&1') do echo [OK] Python installed: %%a
+        for /f "delims=" %%p in ('where python') do (
+            echo %%p | find /i "windowsapps" >nul
+            if !errorlevel! neq 0 (
+                echo %%p > "%TEMP%\.python-path"
+            )
+        )
+    )
 )
-python --version >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [WARNING] Python is Microsoft Store stub. Selenium search will be unavailable.
-    goto :launch
-)
-for /f "tokens=2" %%a in ('python --version 2^>^&1') do echo [OK] Python installed: %%a
-:: Save real python path (skip WindowsApps stub)
-for /f "delims=" %%p in ('where python') do (
-    echo %%p | find /i "windowsapps" >nul
-    if !errorlevel! neq 0 (
-        echo %%p > "%TEMP%\.python-path"
+
+if !PYTHON_OK! equ 0 (
+    where py >nul 2>&1
+    if !errorlevel! equ 0 (
+        py -3 -c "print(1)" >nul 2>&1
+        if !errorlevel! equ 0 (
+            py -3 -c "import sys; print(sys.executable)" > "%TEMP%\.python-path"
+            set /p PYTHON_PATH= < "%TEMP%\.python-path"
+            for /f "tokens=2" %%a in ('py -3 --version 2^>^&1') do echo [OK] Python installed via py: %%a ^(at !PYTHON_PATH!^)
+            set "PYTHON_OK=1"
+        )
+    )
+    if !PYTHON_OK! equ 0 (
+        echo [WARNING] Python did not install. Selenium search will be unavailable.
+        goto :launch
     )
 )
 
@@ -156,17 +181,22 @@ for /f "delims=" %%p in ('where python') do (
 :: 4. pip install seleniumbase
 :: --------------------------------------------------
 :check_selenium
-python -c "import seleniumbase" >nul 2>&1
+set "PY_CMD=python"
+if exist "%TEMP%\.python-path" (
+    set /p PY_CMD= < "%TEMP%\.python-path"
+)
+
+"!PY_CMD!" -c "import seleniumbase" >nul 2>&1
 if !errorlevel! equ 0 (
     echo [OK] seleniumbase installed
     goto :shortcut
 )
 echo [..] Installing seleniumbase (Python)...
-python -m ensurepip --upgrade >nul 2>&1
-python -m pip install seleniumbase
+"!PY_CMD!" -m ensurepip --upgrade >nul 2>&1
+"!PY_CMD!" -m pip install seleniumbase
 if !errorlevel! neq 0 (
     echo [WARNING] seleniumbase install failed. Selenium search unavailable.
-    echo           Run manually: python -m pip install seleniumbase
+    echo           Run manually: "!PY_CMD!" -m pip install seleniumbase
 ) else (
     echo [OK] seleniumbase installed
 )

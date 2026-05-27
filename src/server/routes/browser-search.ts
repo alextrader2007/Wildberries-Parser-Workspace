@@ -1,14 +1,11 @@
 import { Router } from "express";
 import { execSync } from "child_process";
 import path from "path";
-import { fileURLToPath } from "url";
 import { findPython } from "../utils/findPython";
 
 const router = Router();
 
-const myFilename = typeof import.meta !== "undefined" && import.meta.url ? fileURLToPath(import.meta.url) : "";
-const myDirname = myFilename ? path.dirname(myFilename) : process.cwd();
-const SCRIPT_PATH = path.resolve(myDirname, "../../../scripts/search_wb.py");
+const SCRIPT_PATH = path.resolve(process.cwd(), "scripts/search_wb.py");
 
 router.post("/", async (req, res) => {
   try {
