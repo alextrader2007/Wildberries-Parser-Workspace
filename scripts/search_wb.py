@@ -21,14 +21,14 @@ driver = Driver(
 
 all_products = []
 try:
-    driver.set_page_load_timeout(5)
-    target = f"https://www.wildberries.ru/seller/{seller_id}" if seller_id else "https://www.wildberries.ru/"
-    try:
-        driver.open(target)
-    except Exception:
-        driver.execute_script(f"window.location.href = '{target}';")
-        time.sleep(5)
     driver.set_page_load_timeout(30)
+    driver.open("https://www.wildberries.ru/")
+
+    # seller search: after main page loaded, navigate to seller page via JS
+    if seller_id:
+        driver.execute_script(f"window.location.href = 'https://www.wildberries.ru/seller/{seller_id}';")
+        time.sleep(8)
+
     for _ in range(20):
         time.sleep(1.0)
         cookies = driver.execute_cdp_cmd("Network.getAllCookies", {})
@@ -37,7 +37,6 @@ try:
             break
 
     if seller_id:
-        time.sleep(2)
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(3)
         product_ids = driver.execute_script("""
